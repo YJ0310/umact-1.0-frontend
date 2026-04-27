@@ -88,28 +88,29 @@ export default function HospitalDashboard() {
           setDrgList(uniqueDRGs)
 
           const mapped = hospitals.map(h => {
-             const drgs = {}
-             uniqueDRGs.forEach(drg => {
-                const match = hospitalDRG.find(d => d._id.hospital === h.hospital_name && d._id.drg === drg)
-                if (match) {
-                   const avgClaim = Math.round(match.avgClaim)
-                   const claimCount = match.count
-                   const quota = Math.round(claimCount * 0.9) || 1
-                   const oe = (avgClaim / (h.tier === 1 ? 18000 : 25000)).toFixed(3)
-                   drgs[drg] = { avgClaim, claimCount, quota, oe: parseFloat(oe) }
-                } else {
-                   drgs[drg] = { avgClaim: 0, claimCount: 0, quota: 1, oe: 1 }
-                }
-             })
-             // Map _id to id if needed, logic is expecting `id` string
-             return { id: h._id || h.hospital_name, name: h.hospital_name, tier: h.tier, region: h.region, drgs }
+            const tier = Number(h.tier ?? h.final_tier ?? 2)
+            const drgs = {}
+            uniqueDRGs.forEach(drg => {
+              const match = hospitalDRG.find(d => d._id.hospital === h.hospital_name && d._id.drg === drg)
+              if (match) {
+                const avgClaim = Math.round(match.avgClaim)
+                const claimCount = match.count
+                const quota = Math.max(1, Math.round(match.quota || 1))
+                const oe = (avgClaim / (tier === 1 ? 18000 : 25000)).toFixed(3)
+                drgs[drg] = { avgClaim, claimCount, quota, oe: parseFloat(oe) }
+              } else {
+                drgs[drg] = { avgClaim: 0, claimCount: 0, quota: 1, oe: 1 }
+              }
+            })
+            // Map _id to id if needed, logic is expecting `id` string
+            return { id: h._id || h.hospital_name, name: h.hospital_name, tier, region: h.region, drgs }
           })
-          
+
           setAllHospitals(mapped)
           setSelectedHospital(mapped[0]?.id || '')
           setSelectedDRG(uniqueDRGs[0] || '')
           if (result.data.lastUpdated) {
-             setLastUpdate(new Date(result.data.lastUpdated).toLocaleString())
+            setLastUpdate(new Date(result.data.lastUpdated).toLocaleString())
           }
           setLoading(false)
         }
