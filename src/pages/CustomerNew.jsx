@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 /* ══════════════════════════════════════════════════════════════
    DATA / CONSTANTS
@@ -128,6 +128,7 @@ const STEP_KEYS = ['dob', 'gender', 'body', 'smoke', 'health', 'state', 'plan']
    COMPONENT
    ══════════════════════════════════════════════════════════════ */
 export default function CustomerNew() {
+  const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [data, setData] = useState({
     dobYear: '', dobMonth: '', dobDay: '',
@@ -142,6 +143,9 @@ export default function CustomerNew() {
   const [loading, setLoading] = useState(false)
   const [showVerify, setShowVerify] = useState(false)
   const [premiums, setPremiums] = useState(null)
+  const [pricingModel, setPricingModel] = useState(null)
+  const [planEstimates, setPlanEstimates] = useState([])
+  const [quoteMessage, setQuoteMessage] = useState('')
 
   const [quoteId, setQuoteId] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -169,6 +173,8 @@ export default function CustomerNew() {
     if (isLastStep) {
       setLoading(true)
       try {
+        const uid = localStorage.getItem('google_uid') || null
+        const hasRegisteredAccount = localStorage.getItem('customer_account_ready') === 'true' && Boolean(uid)
         const payload = {
           dobYear: Number(data.dobYear),
           dobMonth: Number(data.dobMonth),
@@ -181,7 +187,8 @@ export default function CustomerNew() {
           state: data.state,
           region: data.regionKey,
           planType: data.planType,
-          firebaseUid: localStorage.getItem('google_uid') || 'demo-user-123'
+          firebaseUid: uid,
+          previewOnly: hasRegisteredAccount
         }
         const res = await fetch('/api/customer/quote', {
           method: 'POST',
@@ -191,15 +198,27 @@ export default function CustomerNew() {
         const result = await res.json()
         if (result.success) {
           setPremiums(result.premiums)
-          setQuoteId(result.quoteId)
+          setQuoteId(result.quoteId || null)
+          setPricingModel(result.model || null)
+          setPlanEstimates(result.planEstimates || [])
+          setQuoteMessage(result.message || '')
+          if (result.quoteId) {
+            sessionStorage.setItem('pending_quote_id', result.quoteId)
+          }
         } else {
           console.error("Failed to get quote", result.error)
           // Fallback to local
           setPremiums(calcPremium({ ...data, age, bmiRange }))
+          setPricingModel(null)
+          setPlanEstimates([])
+          setQuoteMessage('Using fallback estimate. Please retry for model-driven explanation.')
         }
       } catch (e) {
         console.error("API error", e)
         setPremiums(calcPremium({ ...data, age, bmiRange }))
+        setPricingModel(null)
+        setPlanEstimates([])
+        setQuoteMessage('Using fallback estimate due to network error.')
       }
       setLoading(false)
       setShowResult(true)
@@ -259,20 +278,28 @@ export default function CustomerNew() {
   const condCount = data.conditions.filter(c => c !== 'none').length
   const selectedState = STATES.find(s => s.name === data.state)
 
+  const handleContinueToDashboard = () => {
+    const hasRegisteredAccount = localStorage.getItem('customer_account_ready') === 'true'
+    if (hasRegisteredAccount) {
+      navigate('/dashboard')
+      return
+    }
+
+    if (!quoteId) {
+      alert('Please calculate and save a quote first before sign in.')
+      return
+    }
+
+    sessionStorage.setItem('pending_quote_id', quoteId)
+    navigate('/dashboard')
+  }
+
   /* ── RESULT ──────────────────────────────────────────────── */
   if (showResult && premiums) {
     const avgBmi = bmiRange ? (bmiRange.low + bmiRange.high) / 2 : 24
     const bmiCat = bmiCategory(avgBmi)
-    const factors = []
-    if (age >= 50) factors.push({ label: 'Age loading (age ≥ 50)', impact: '+' + Math.round((Math.min(age / 84, 1) * 75 - 30)) + '%', dir: 'up' })
-    if (avgBmi >= 30) factors.push({ label: 'BMI loading', impact: avgBmi >= 40 ? '+28%' : '+12%', dir: 'up' })
-    if (data.smoker === 'Yes') factors.push({ label: 'Smoker loading', impact: '+18%', dir: 'up' })
-    if (condCount > 0) factors.push({ label: `Health conditions (${condCount})`, impact: `+${condCount * 10}%`, dir: 'up' })
-    if (selectedState && ['Eastern', 'East Malaysia'].includes(selectedState.region)) {
-      factors.push({ label: `Regional adjustment (${selectedState.region})`, impact: selectedState.region === 'East Malaysia' ? '-12%' : '-8%', dir: 'down' })
-    } else if (selectedState && selectedState.region === 'Central') {
-      factors.push({ label: 'Regional adjustment (Central)', impact: '+12%', dir: 'up' })
-    }
+    const factors = pricingModel?.reasons || []
+    const hasRegisteredAccount = localStorage.getItem('customer_account_ready') === 'true'
 
     return (
       <div className="container" style={{ maxWidth: 560 }}>
@@ -293,6 +320,11 @@ export default function CustomerNew() {
             <div style={{ marginTop: '0.5rem', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>
               ≈ RM {premiums.annual.toLocaleString()} /year
             </div>
+            {pricingModel?.riskScore !== undefined && (
+              <div style={{ marginTop: '0.6rem', fontSize: 'var(--font-size-sm)' }}>
+                Risk score: <strong>{pricingModel.riskScore}/100 ({pricingModel.riskBand})</strong>
+              </div>
+            )}
           </div>
         </div>
 
@@ -300,23 +332,45 @@ export default function CustomerNew() {
         <div className="card animate-in" style={{ animationDelay: '0.2s', marginTop: '1rem' }}>
           <h4 style={{ marginBottom: '0.75rem' }}>📊 Why this price?</h4>
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-            Your premium is calculated based on your risk profile. Here's how each factor affects your price:
+            Backend model explanation for your personalized premium:
           </p>
           {factors.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {factors.map((f, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: f.dir === 'up' ? 'var(--danger-light)' : 'var(--success-light)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: f.direction === 'up' ? 'var(--danger-light)' : 'var(--success-light)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)' }}>
                   <span>{f.label}</span>
-                  <strong style={{ color: f.dir === 'up' ? 'var(--danger)' : 'var(--success)' }}>{f.impact}</strong>
+                  <strong style={{ color: f.direction === 'up' ? 'var(--danger)' : 'var(--success)' }}>
+                    {f.impactAnnual >= 0 ? '+' : ''}RM {Math.abs(f.impactAnnual).toLocaleString()} /year
+                  </strong>
                 </div>
               ))}
             </div>
           ) : (
             <div style={{ padding: '0.5rem 0.75rem', background: 'var(--success-light)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', textAlign: 'center' }}>
-              ✅ No additional loadings — you have a healthy baseline!
+              ✅ Model explanation unavailable. Please retry for full transparency.
             </div>
           )}
+          {quoteMessage && (
+            <p style={{ marginTop: '0.75rem', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{quoteMessage}</p>
+          )}
         </div>
+
+        {planEstimates.length > 0 && (
+          <div className="card animate-in" style={{ animationDelay: '0.25s', marginTop: '1rem' }}>
+            <h4 style={{ marginBottom: '0.75rem' }}>⚡ Real-time Plan Estimates</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+              {planEstimates.map(plan => (
+                <div key={plan.name} style={{ padding: '0.6rem 0.75rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontWeight: 700 }}>{plan.name}</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)' }}>RM {plan.monthly.toLocaleString()} /month</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                    RM {plan.monthlyRange.min.toLocaleString()} - {plan.monthlyRange.max.toLocaleString()} /month
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Verification CTA */}
         {!showVerify ? (
@@ -410,9 +464,21 @@ export default function CustomerNew() {
           </div>
         </div>
 
+        {hasRegisteredAccount && (
+          <div className="card animate-in" style={{ marginTop: '1rem', background: 'var(--warning-light)', borderColor: 'var(--warning)' }}>
+            <h4 style={{ marginBottom: '0.5rem' }}>ℹ️ Existing Account Mode</h4>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+              Your account is already registered. New quote inputs here are preview-only and do not update your policy profile.
+              To request plan/state/BMI changes, submit a request to your insurer.
+            </p>
+          </div>
+        )}
+
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
           <button className="btn btn-secondary" onClick={handleBack}>← Back</button>
-          <Link to="/dashboard" className="btn btn-primary" style={{ flex: 1 }}>Sign In to Continue →</Link>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleContinueToDashboard}>
+            {hasRegisteredAccount ? 'Go to Dashboard →' : 'Sign In to Continue →'}
+          </button>
         </div>
       </div>
     )

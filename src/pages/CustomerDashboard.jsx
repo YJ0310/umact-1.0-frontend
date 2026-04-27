@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { jwtDecode } from 'jwt-decode'
+import { useNavigate } from 'react-router-dom'
 export default function CustomerDashboard() {
+  const navigate = useNavigate()
   const [signedIn, setSignedIn] = useState(false)
   const [loading, setLoading] = useState(false)
   const [userData, setUserData] = useState(null)
@@ -11,23 +13,72 @@ export default function CustomerDashboard() {
   const [claimForm, setClaimForm] = useState({ type: 'Medical', hospital: '', amount: '', date: '', desc: '' })
   const [submittingClaim, setSubmittingClaim] = useState(false)
 
-  const processLogin = (decoded) => {
+  const processLogin = async (decoded) => {
     setLoading(true)
-    fetch('/api/customer/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(decoded)
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          localStorage.setItem('google_profile', JSON.stringify(decoded))
-          localStorage.setItem('google_uid', decoded.sub)
-          setUserData({ ...data, googleProfile: decoded })
-          setSignedIn(true)
-        }
+    try {
+      const loginRes = await fetch('/api/customer/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(decoded)
       })
-      .finally(() => setLoading(false))
+      const data = await loginRes.json()
+
+      if (data.success) {
+        localStorage.setItem('google_profile', JSON.stringify(decoded))
+        localStorage.setItem('google_uid', decoded.sub)
+        localStorage.setItem('customer_account_ready', 'true')
+        sessionStorage.removeItem('pending_quote_id')
+        setUserData({ ...data, googleProfile: decoded })
+        setSignedIn(true)
+        return
+      }
+
+      if (data.code === 'NO_PROFILE') {
+        const pendingQuoteId = sessionStorage.getItem('pending_quote_id')
+        if (pendingQuoteId) {
+          const regRes = await fetch('/api/customer/register-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...decoded, quoteId: pendingQuoteId })
+          })
+          const regData = await regRes.json()
+
+          if (regData.success) {
+            sessionStorage.removeItem('pending_quote_id')
+            const retryRes = await fetch('/api/customer/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(decoded)
+            })
+            const retryData = await retryRes.json()
+            if (retryData.success) {
+              localStorage.setItem('google_profile', JSON.stringify(decoded))
+              localStorage.setItem('google_uid', decoded.sub)
+              localStorage.setItem('customer_account_ready', 'true')
+              setUserData({ ...retryData, googleProfile: decoded })
+              setSignedIn(true)
+              return
+            }
+          }
+        }
+
+        alert('No onboarding data found. Please complete quote first for initial profile collection.')
+        localStorage.removeItem('google_profile')
+        localStorage.removeItem('google_uid')
+        localStorage.removeItem('customer_account_ready')
+        setSignedIn(false)
+        setUserData(null)
+        navigate('/get-quote')
+        return
+      }
+
+      alert(data.error || 'Sign in failed. Please try again.')
+    } catch (err) {
+      console.error('Login flow error:', err)
+      alert('Network error during sign in. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -180,6 +231,7 @@ export default function CustomerDashboard() {
           setUserData(null);
           localStorage.removeItem('google_profile');
           localStorage.removeItem('google_uid');
+          localStorage.removeItem('customer_account_ready');
         }}>Sign Out</button>
       </div>
 
