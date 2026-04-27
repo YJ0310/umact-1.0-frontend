@@ -29,8 +29,8 @@ function sgPvtCopay(claim) {
   return paid
 }
 
-function chinaBlendedRate(claimCount, quota) {
-  if (claimCount === 0 || quota === 0) return 1.0
+function chinaBlendedRate(claimCount, quota, enforceQuota = true) {
+  if (!enforceQuota || claimCount === 0 || quota <= 0) return 1.0
   const buffer = quota * 1.2
   const penalty = quota * 1.5
 
@@ -95,11 +95,12 @@ export default function HospitalDashboard() {
               if (match) {
                 const avgClaim = Math.round(match.avgClaim)
                 const claimCount = match.count
-                const quota = Math.max(1, Math.round(match.quota || 1))
+                const enforceQuota = Boolean(match.enforceQuota)
+                const quota = enforceQuota ? Math.max(1, Math.round(match.quota || 1)) : 0
                 const oe = (avgClaim / (tier === 1 ? 18000 : 25000)).toFixed(3)
-                drgs[drg] = { avgClaim, claimCount, quota, oe: parseFloat(oe) }
+                drgs[drg] = { avgClaim, claimCount, quota, enforceQuota, oe: parseFloat(oe) }
               } else {
-                drgs[drg] = { avgClaim: 0, claimCount: 0, quota: 1, oe: 1 }
+                drgs[drg] = { avgClaim: 0, claimCount: 0, quota: 0, enforceQuota: false, oe: 1 }
               }
             })
             // Map _id to id if needed, logic is expecting `id` string
@@ -157,7 +158,7 @@ export default function HospitalDashboard() {
       newLabel = 'China Model'
       newData = oldData.map((v, i) => {
         const d = hospital.drgs[labels[i]]
-        return Math.round(v * chinaBlendedRate(d.claimCount, d.quota))
+        return Math.round(v * chinaBlendedRate(d.claimCount, d.quota, d.enforceQuota))
       })
     } else {
       newLabel = 'Current Policy'
@@ -174,7 +175,7 @@ export default function HospitalDashboard() {
       datasets.push({
         label: 'China Model', data: oldData.map((v, i) => {
           const d = hospital.drgs[labels[i]]
-          return Math.round(v * chinaBlendedRate(d.claimCount, d.quota))
+          return Math.round(v * chinaBlendedRate(d.claimCount, d.quota, d.enforceQuota))
         }), backgroundColor: 'rgba(76,110,245,0.6)', borderRadius: 4
       })
     }
@@ -213,7 +214,7 @@ export default function HospitalDashboard() {
       datasets.push({
         label: 'China Model', data: sorted.map(h => {
           const d = h.drgs[selectedDRG]
-          return Math.round(d.avgClaim * chinaBlendedRate(d.claimCount, d.quota))
+          return Math.round(d.avgClaim * chinaBlendedRate(d.claimCount, d.quota, d.enforceQuota))
         }), backgroundColor: 'rgba(76,110,245,0.4)', borderRadius: 4, borderColor: 'rgba(76,110,245,1)', borderWidth: 1
       })
     }
@@ -357,23 +358,27 @@ export default function HospitalDashboard() {
                   {drgList.map(drg => {
                     const d = hospital.drgs[drg]
                     if (!d || d.claimCount === 0) return null
-                    const pct = Math.round((d.claimCount / d.quota) * 100)
-                    const zone = pct <= 120 ? 'badge-success' : pct <= 150 ? 'badge-warning' : 'badge-danger'
-                    const zoneLabel = pct <= 120 ? 'Normal' : pct <= 150 ? 'Watch' : 'Over'
+                    const pct = d.enforceQuota ? Math.round((d.claimCount / d.quota) * 100) : null
+                    const zone = !d.enforceQuota ? 'badge-warning' : pct <= 120 ? 'badge-success' : pct <= 150 ? 'badge-warning' : 'badge-danger'
+                    const zoneLabel = !d.enforceQuota ? 'Observe' : pct <= 120 ? 'Normal' : pct <= 150 ? 'Watch' : 'Over'
                     return (
                       <tr key={drg}>
                         <td style={{ fontWeight: 500 }}>{drg}</td>
                         <td>RM {d.avgClaim.toLocaleString()}</td>
                         <td>{d.claimCount}</td>
-                        <td>{d.quota}</td>
+                        <td>{d.enforceQuota ? d.quota : 'N/A'}</td>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <div className="progress-bar" style={{ width: 60, height: 6 }}>
-                              <div className={`progress-fill ${pct <= 120 ? 'green' : pct <= 150 ? 'yellow' : 'red'}`}
-                                style={{ width: `${Math.min(pct, 200) / 2}%` }} />
+                          {d.enforceQuota ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <div className="progress-bar" style={{ width: 60, height: 6 }}>
+                                <div className={`progress-fill ${pct <= 120 ? 'green' : pct <= 150 ? 'yellow' : 'red'}`}
+                                  style={{ width: `${Math.min(pct, 200) / 2}%` }} />
+                              </div>
+                              <span style={{ fontSize: 'var(--font-size-xs)' }}>{pct}%</span>
                             </div>
-                            <span style={{ fontSize: 'var(--font-size-xs)' }}>{pct}%</span>
-                          </div>
+                          ) : (
+                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>N/A</span>
+                          )}
                         </td>
                         <td>{d.oe}</td>
                         <td><span className={`badge ${zone}`}>{zoneLabel}</span></td>
