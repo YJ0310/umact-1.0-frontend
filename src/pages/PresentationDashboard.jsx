@@ -27,7 +27,7 @@ function CopayChart({ showBaseline = true }) {
       },
       options: {
         responsive: true,
-        plugins: { 
+        plugins: {
           legend: { position: 'bottom' },
           annotation: showBaseline ? {
             annotations: {
@@ -56,18 +56,18 @@ function FindingCard({ finding, defaultExpanded = false }) {
   return (
     <div className={`card finding-card ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(!expanded)}>
       <div className="finding-header">
-        <div style={{flex: 1}}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem'}}>
-            <span style={{fontSize: '1.5rem'}}>{finding.icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>{finding.icon}</span>
             <span className={`badge ${finding.trend === 'up' ? 'badge-danger' : finding.trend === 'down' ? 'badge-success' : 'badge-primary'}`}>
               {finding.badge} {finding.trend === 'up' ? '↑' : finding.trend === 'down' ? '↓' : ''}
             </span>
           </div>
-          <div style={{fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.25rem'}}>{finding.title}</div>
-          <div style={{fontSize: 'var(--font-size-2xl)', fontWeight: 800, color: finding.valueColor}}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{finding.title}</div>
+          <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 800, color: finding.valueColor }}>
             {finding.value}
           </div>
-          <div style={{fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '0.25rem'}}>
+          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
             {finding.subtitle}
           </div>
         </div>
@@ -75,7 +75,7 @@ function FindingCard({ finding, defaultExpanded = false }) {
       </div>
       <div className="finding-detail">
         <div className="finding-detail-content">
-          <strong>📖 How we derived this:</strong><br/>
+          <strong>📖 How we derived this:</strong><br />
           {finding.detail}
         </div>
       </div>
@@ -86,15 +86,15 @@ function FindingCard({ finding, defaultExpanded = false }) {
 function ShapChart({ data }) {
   if (!data) return null;
   return (
-    <div style={{marginTop: '1rem'}}>
+    <div style={{ marginTop: '1rem' }}>
       {data.map((item, i) => (
-        <div key={i} style={{marginBottom: '0.5rem'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', marginBottom: '2px'}}>
+        <div key={i} style={{ marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', marginBottom: '2px' }}>
             <span>{item.feature}</span>
             <span>{(item.impact * 100).toFixed(0)}%</span>
           </div>
-          <div style={{height: '8px', background: 'var(--bg-card)', borderRadius: '4px', overflow: 'hidden'}}>
-            <div style={{height: '100%', width: `${item.impact * 100}%`, background: 'var(--accent)'}}></div>
+          <div style={{ height: '8px', background: 'var(--bg-card)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${item.impact * 100}%`, background: 'var(--accent)' }}></div>
           </div>
         </div>
       ))}
@@ -157,38 +157,38 @@ export default function PresentationDashboard() {
       <div className="dashboard-header animate-in">
         <div>
           <h1>🎯 Executive Presentation</h1>
-          <p style={{color: 'var(--text-secondary)'}}>CEO • CFO • CTO • COO aligned insights</p>
-          <p style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '4px'}}>
+          <p style={{ color: 'var(--text-secondary)' }}>CEO • CFO • CTO • COO aligned insights</p>
+          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
             Last data refresh: {data?.lastUpdate ? new Date(data.lastUpdate).toLocaleString() : 'Just now'}
           </p>
         </div>
-        <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
-          <button className="badge badge-primary" style={{cursor: 'pointer', border: 'none'}} onClick={() => window.print()}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button className="badge badge-primary" style={{ cursor: 'pointer', border: 'none' }} onClick={() => window.print()}>
             📥 Export Report
           </button>
-          <span className="badge badge-primary" style={{fontSize: '0.8rem'}}>Team ChinShi • UMACT 2026</span>
+          <span className="badge badge-primary" style={{ fontSize: '0.8rem' }}>Team ChinShi • UMACT 2026</span>
         </div>
       </div>
 
-      <div className="tabs animate-in" style={{animationDelay: '0.05s'}}>
+      <div className="tabs animate-in" style={{ animationDelay: '0.05s' }}>
         {[['ceo', '👩‍💼 CEO'], ['cfo', '💵 CFO'], ['cto', '🧠 CTO'], ['coo', '⚙️ COO']].map(([k, l]) => (
           <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
 
       {tab === 'ceo' && (
-        <div className="animate-in" style={{animationDelay: '0.1s'}}>
+        <div className="animate-in" style={{ animationDelay: '0.1s' }}>
           {/* Hero Banner */}
-          <div className="card" style={{background: 'linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%)', color: 'white', marginBottom: '1.25rem', border: 'none'}}>
-            <div style={{padding: '1.5rem'}}>
-              <h2 style={{fontSize: 'var(--font-size-2xl)', marginBottom: '0.5rem'}}>Executive Summary</h2>
-              <p style={{fontSize: 'var(--font-size-lg)', opacity: 0.9}}>
+          <div className="card" style={{ background: 'linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%)', color: 'white', marginBottom: '1.25rem', border: 'none' }}>
+            <div style={{ padding: '1.5rem' }}>
+              <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: '0.5rem' }}>Executive Summary</h2>
+              <p style={{ fontSize: 'var(--font-size-lg)', opacity: 0.9 }}>
                 "FMV clipping saves <strong>{fmtM(data?.summary?.totalSaving || 0)}</strong> with zero new infrastructure by aligning Tier 2 billing to historical Tier 1 benchmarks."
               </p>
-              <div style={{marginTop: '1.5rem', display: 'flex', gap: '1rem'}}>
-                <div className="badge" style={{background: 'rgba(255,255,255,0.2)', color: 'white'}}>-3.9% Insurer Spend</div>
-                <div className="badge" style={{background: 'rgba(255,255,255,0.2)', color: 'white'}}>-14.6% Member OOP</div>
-                <div className="badge" style={{background: 'rgba(255,255,255,0.2)', color: 'white'}}>100% Data Driven</div>
+              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+                <div className="badge" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>-3.9% Insurer Spend</div>
+                <div className="badge" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>-14.6% Member OOP</div>
+                <div className="badge" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>100% Data Driven</div>
               </div>
             </div>
           </div>
@@ -197,9 +197,9 @@ export default function PresentationDashboard() {
             {CEO_FINDINGS.map((f, i) => <FindingCard key={i} finding={f} defaultExpanded={i < 2} />)}
           </div>
 
-          <div className="card" style={{marginTop: '1.25rem', borderLeft: '4px solid var(--success)'}}>
-            <h4 style={{marginBottom: '0.5rem'}}>✅ Recommended Decision</h4>
-            <p style={{fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)'}}>
+          <div className="card" style={{ marginTop: '1.25rem', borderLeft: '4px solid var(--success)' }}>
+            <h4 style={{ marginBottom: '0.5rem' }}>✅ Recommended Decision</h4>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
               Approve the deployment of the <strong>CatBoost FMV Clipping Model</strong> for all Tier 2 claims starting Q3 2026. This will immediately reduce medical inflation and improve portfolio sustainability.
             </p>
           </div>
@@ -207,42 +207,42 @@ export default function PresentationDashboard() {
       )}
 
       {tab === 'cfo' && (
-        <div className="animate-in" style={{animationDelay: '0.1s'}}>
-          <div className="grid grid-2" style={{marginBottom: '1.25rem'}}>
-            <div className="card" style={{background: 'var(--bg-card)'}}>
-              <h3 style={{marginBottom: '1rem'}}>💵 ROI Analysis (Annualized)</h3>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)'}}>
-                  <span style={{color: 'var(--text-muted)'}}>Est. Implementation Cost</span>
-                  <span style={{fontWeight: 700}}>RM 850k</span>
+        <div className="animate-in" style={{ animationDelay: '0.1s' }}>
+          <div className="grid grid-2" style={{ marginBottom: '1.25rem' }}>
+            <div className="card" style={{ background: 'var(--bg-card)' }}>
+              <h3 style={{ marginBottom: '1rem' }}>💵 ROI Analysis (Annualized)</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Est. Implementation Cost</span>
+                  <span style={{ fontWeight: 700 }}>RM 850k</span>
                 </div>
-                <div style={{display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)'}}>
-                  <span style={{color: 'var(--text-muted)'}}>Projected Annual Savings</span>
-                  <span style={{fontWeight: 700, color: 'var(--success)'}}>{fmtM(data?.summary?.insurerSaving || 0)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Projected Annual Savings</span>
+                  <span style={{ fontWeight: 700, color: 'var(--success)' }}>{fmtM(data?.summary?.insurerSaving || 0)}</span>
                 </div>
-                <div style={{display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)'}}>
-                  <span style={{color: 'var(--text-muted)'}}>Payback Period</span>
-                  <span style={{fontWeight: 700, color: 'var(--accent)'}}>~3 Months</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Payback Period</span>
+                  <span style={{ fontWeight: 700, color: 'var(--accent)' }}>~3 Months</span>
                 </div>
-                <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                  <span style={{color: 'var(--text-muted)'}}>ROI (Year 1)</span>
-                  <span style={{fontWeight: 700, color: 'var(--success)'}}>+4,500%</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>ROI (Year 1)</span>
+                  <span style={{ fontWeight: 700, color: 'var(--success)' }}>+4,500%</span>
                 </div>
               </div>
             </div>
 
             <div className="card">
-              <h3 style={{marginBottom: '1rem'}}>📈 Financial Impact Summary</h3>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem'}}>
+              <h3 style={{ marginBottom: '1rem' }}>📈 Financial Impact Summary</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 {[
                   { label: 'Insurer Spend', before: 'RM 1.00B', after: 'RM 0.96B', delta: '-3.9%' },
                   { label: 'Member OOP', before: 'RM 41.6M', after: 'RM 35.6M', delta: '-14.6%' },
                 ].map((item, i) => (
-                  <div key={i} style={{padding: '0.75rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border)'}}>
-                    <div style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '4px'}}>{item.label}</div>
-                    <div style={{fontWeight: 800, fontSize: 'var(--font-size-lg)'}}>{item.after}</div>
-                    <div style={{fontSize: 'var(--font-size-xs)', color: 'var(--success)'}}>{item.delta} reduction</div>
-                    <div style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '4px'}}>Baseline: {item.before}</div>
+                  <div key={i} style={{ padding: '0.75rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', textAlign: 'center', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '4px' }}>{item.label}</div>
+                    <div style={{ fontWeight: 800, fontSize: 'var(--font-size-lg)' }}>{item.after}</div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--success)' }}>{item.delta} reduction</div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>Baseline: {item.before}</div>
                   </div>
                 ))}
               </div>
@@ -250,19 +250,19 @@ export default function PresentationDashboard() {
           </div>
 
           <div className="card">
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3>📊 Co-payment Gap Analysis</h3>
               <div className="badge badge-danger">Leakage: {fmtM(data?.summary?.totalSaving || 0)}/yr</div>
             </div>
-            <p style={{color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: 'var(--font-size-sm)'}}>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: 'var(--font-size-sm)' }}>
               Horizontal line indicates the current RM 3,000 cap. Notice how the current model fails to steer behavior as bill sizes increase.
             </p>
             <CopayChart />
           </div>
-          
-          <div className="card" style={{marginTop: '1.25rem'}}>
+
+          <div className="card" style={{ marginTop: '1.25rem' }}>
             <h3>🏥 Savings Breakdown by Diagnosis</h3>
-            <div className="table-wrapper" style={{marginTop: '0.75rem'}}>
+            <div className="table-wrapper" style={{ marginTop: '0.75rem' }}>
               <table>
                 <thead>
                   <tr><th>Diagnosis Category</th><th>Estimated Exposure</th><th>Projected Saving</th></tr>
@@ -272,7 +272,7 @@ export default function PresentationDashboard() {
                     <tr key={i}>
                       <td>{d.name}</td>
                       <td>{fmt(d.saving * 4.2)}</td>
-                      <td style={{color: 'var(--success)', fontWeight: 600}}>{fmt(d.saving)}</td>
+                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>{fmt(d.saving)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -283,11 +283,11 @@ export default function PresentationDashboard() {
       )}
 
       {tab === 'cto' && (
-        <div className="animate-in" style={{animationDelay: '0.1s'}}>
+        <div className="animate-in" style={{ animationDelay: '0.1s' }}>
           <div className="grid grid-2">
             <div className="card">
               <h3>🏆 Model Leaderboard</h3>
-              <p style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '1rem'}}>
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                 Benchmarked across 7 algorithms using grouped cross-validation.
               </p>
               <div className="table-wrapper">
@@ -297,7 +297,7 @@ export default function PresentationDashboard() {
                   </thead>
                   <tbody>
                     {(data?.models || []).map((m, i) => (
-                      <tr key={i} style={m.name.includes('Champion') ? {background: 'var(--accent-light)'} : {}}>
+                      <tr key={i} style={m.name.includes('Champion') ? { background: 'var(--accent-light)' } : {}}>
                         <td>{m.name}</td>
                         <td>{m.rmsle}</td>
                         <td>{m.r2}</td>
@@ -311,24 +311,24 @@ export default function PresentationDashboard() {
 
             <div className="card">
               <h3>🧠 Feature Importance (SHAP)</h3>
-              <p style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '1rem'}}>
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                 Top drivers for Fair Market Value prediction.
               </p>
               <ShapChart data={data?.shap} />
-              <div style={{marginTop: '1.5rem'}}>
+              <div style={{ marginTop: '1.5rem' }}>
                 <h4>⚙️ Model Governance</h4>
-                <ul style={{fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', paddingLeft: '1.25rem', marginTop: '0.5rem'}}>
+                <ul style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', paddingLeft: '1.25rem', marginTop: '0.5rem' }}>
                   <li>Retraining: Every 6 months with latest Tier 1 data.</li>
-                  <li>Drift Monitoring: Weekly alert if O/E ratio shifts > 5%.</li>
+                  <li>Drift Monitoring: Weekly alert if O/E ratio shifts &gt; 5%.</li>
                   <li>Data Source: Core MongoDB Actuarial Engine.</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <div className="card" style={{marginTop: '1.25rem'}}>
+          <div className="card" style={{ marginTop: '1.25rem' }}>
             <h3>🛠️ System Architecture & Pipeline</h3>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', position: 'relative'}}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', position: 'relative' }}>
               {/* Simple Flow Diagram */}
               {[
                 { label: 'Claim Ingest', icon: '📥' },
@@ -337,13 +337,13 @@ export default function PresentationDashboard() {
                 { label: 'Audit Triage', icon: '⚖️' },
                 { label: 'Realized Saving', icon: '💎' }
               ].map((step, i, arr) => (
-                <div key={i} style={{textAlign: 'center', flex: 1, zIndex: 2}}>
-                  <div style={{width: '50px', height: '50px', background: 'var(--accent)', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>
+                <div key={i} style={{ textAlign: 'center', flex: 1, zIndex: 2 }}>
+                  <div style={{ width: '50px', height: '50px', background: 'var(--accent)', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                     {step.icon}
                   </div>
-                  <div style={{fontSize: 'var(--font-size-xs)', marginTop: '8px', fontWeight: 600}}>{step.label}</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', marginTop: '8px', fontWeight: 600 }}>{step.label}</div>
                   {i < arr.length - 1 && (
-                    <div style={{position: 'absolute', top: '25px', left: `${(i * 20) + 15}%`, width: '10%', height: '2px', background: 'var(--border)', zIndex: 1}}></div>
+                    <div style={{ position: 'absolute', top: '25px', left: `${(i * 20) + 15}%`, width: '10%', height: '2px', background: 'var(--border)', zIndex: 1 }}></div>
                   )}
                 </div>
               ))}
@@ -353,14 +353,14 @@ export default function PresentationDashboard() {
       )}
 
       {tab === 'coo' && (
-        <div className="animate-in" style={{animationDelay: '0.1s'}}>
+        <div className="animate-in" style={{ animationDelay: '0.1s' }}>
           <div className="grid grid-2">
-            <div className="card" style={{borderTop: '4px solid var(--accent)'}}>
+            <div className="card" style={{ borderTop: '4px solid var(--accent)' }}>
               <h3>📋 Recommended Strategy: Singapore Hybrid</h3>
-              <p style={{fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '0.5rem'}}>
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                 Our analysis concludes the <strong>Singapore Government sliding model</strong> is the most suitable for the Malaysian market.
               </p>
-              <div className="table-wrapper" style={{marginTop: '1rem'}}>
+              <div className="table-wrapper" style={{ marginTop: '1rem' }}>
                 <table>
                   <thead><tr><th>Claim Band</th><th>Reimbursement</th></tr></thead>
                   <tbody>
@@ -375,29 +375,29 @@ export default function PresentationDashboard() {
 
             <div className="card">
               <h3>🔍 Audit Triage Workflow</h3>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(231,76,60,0.1)', borderRadius: 'var(--radius-md)'}}>
-                  <span style={{color: 'var(--danger)', fontWeight: 600}}>🔴 High Priority</span>
-                  <span style={{fontWeight: 700}}>{data?.audit?.high || 772} Claims</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(231,76,60,0.1)', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ color: 'var(--danger)', fontWeight: 600 }}>🔴 High Priority</span>
+                  <span style={{ fontWeight: 700 }}>{data?.audit?.high || 772} Claims</span>
                   <span>Manual Audit Required</span>
                 </div>
-                <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(241,196,15,0.1)', borderRadius: 'var(--radius-md)'}}>
-                  <span style={{color: 'var(--warning)', fontWeight: 600}}>🟡 Medium Priority</span>
-                  <span style={{fontWeight: 700}}>{data?.audit?.medium || 3140} Claims</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(241,196,15,0.1)', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ color: 'var(--warning)', fontWeight: 600 }}>🟡 Medium Priority</span>
+                  <span style={{ fontWeight: 700 }}>{data?.audit?.medium || 3140} Claims</span>
                   <span>Automated Flagging</span>
                 </div>
-                <div style={{display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(46,204,113,0.1)', borderRadius: 'var(--radius-md)'}}>
-                  <span style={{color: 'var(--success)', fontWeight: 600}}>🟢 Low Priority</span>
-                  <span style={{fontWeight: 700}}>{data?.audit?.low || 5060} Claims</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(46,204,113,0.1)', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ color: 'var(--success)', fontWeight: 600 }}>🟢 Low Priority</span>
+                  <span style={{ fontWeight: 700 }}>{data?.audit?.low || 5060} Claims</span>
                   <span>Auto-Pass (FMV Compliant)</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="card" style={{marginTop: '1.25rem'}}>
+          <div className="card" style={{ marginTop: '1.25rem' }}>
             <h3>📅 Implementation Roadmap (3-Phase Rollout)</h3>
-            <div className="table-wrapper" style={{marginTop: '0.75rem'}}>
+            <div className="table-wrapper" style={{ marginTop: '0.75rem' }}>
               <table>
                 <thead>
                   <tr><th>Phase</th><th>Focus Area</th><th>Key KPI</th><th>Timeline</th></tr>
