@@ -141,19 +141,18 @@ function ChartComponent({ config, height = 300 }) {
 }
 
 function UsageBar({ pct }) {
-  const safePct = Math.min(pct || 0, 150)
+  const displayPct = Math.min(pct || 0, 100)
   let color = 'var(--success)'
-  if (safePct > 120) color = 'var(--danger)'
-  else if (safePct > 100) color = 'var(--warning)'
-
+  if (pct > 120) color = 'var(--danger)'
+  else if (pct > 100) color = 'var(--warning)'
+  
   return (
     <div style={{ width: '100%', minWidth: '60px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
         <span style={{ fontWeight: 600 }}>{pct ? `${pct.toFixed(1)}%` : '0%'}</span>
       </div>
-      <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-        <div style={{ width: `${Math.min(safePct, 100)}%`, height: '100%', background: color, transition: 'width 0.3s' }}></div>
-        {safePct > 100 && <div style={{ width: `${Math.min(safePct - 100, 50)}%`, height: '100%', background: 'var(--danger)', opacity: 0.6 }}></div>}
+      <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+        <div style={{ width: `${displayPct}%`, height: '100%', background: color, transition: 'width 0.3s' }}></div>
       </div>
     </div>
   )
