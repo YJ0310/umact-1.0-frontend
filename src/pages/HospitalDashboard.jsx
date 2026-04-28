@@ -55,6 +55,12 @@ function shortenDRG(name) {
   return name
 }
 
+function getSubCategory(name) {
+  if (!name) return 'Unknown'
+  const parts = name.split(' | ')
+  return parts.length >= 2 ? parts[1] : 'Other'
+}
+
 /* ══════════════════════════════════════════════════════════════
    CHART COMPONENTS
    ══════════════════════════════════════════════════════════════ */
@@ -81,6 +87,7 @@ export default function HospitalDashboard() {
   const [loading, setLoading] = useState(true)
 
   const [viewMode, setViewMode] = useState('byHospital') // 'byHospital' | 'byDRG' | 'tiers'
+  const [drgGroupMode, setDrgGroupMode] = useState('detailed') // 'detailed' | 'category'
   const [selectedHospital, setSelectedHospital] = useState('')
   const [selectedDRG, setSelectedDRG] = useState('')
   const [policyToggle, setPolicyToggle] = useState('current') // 'current' | 'singapore' | 'china' | 'both'
@@ -222,26 +229,67 @@ export default function HospitalDashboard() {
     }
   }, [allHospitals])
 
+  const groupedHospitalData = useMemo(() => {
+    if (!hospital || drgGroupMode === 'detailed') return null
+    const groups = {}
+    Object.entries(hospital.drgs).forEach(([fullName, data]) => {
+      const cat = getSubCategory(fullName)
+      if (!groups[cat]) {
+        groups[cat] = {
+          avgClaim: 0, claimCount: 0, poolAmount: 0, claimRequestAmount: 0,
+          reimbursedAmount: 0, penaltyAmount: 0, usagePct: 0,
+          statusZone: 'Normal', enforceQuota: false, totalAvgClaimSum: 0, count: 0
+        }
+      }
+      const g = groups[cat]
+      g.claimCount += data.claimCount
+      g.poolAmount += data.poolAmount
+      g.claimRequestAmount += data.claimRequestAmount
+      g.reimbursedAmount += data.reimbursedAmount
+      g.penaltyAmount += data.penaltyAmount
+      if (data.avgClaim > 0) {
+        g.totalAvgClaimSum += data.avgClaim
+        g.count += 1
+      }
+      if (data.enforceQuota) g.enforceQuota = true
+    })
+    Object.keys(groups).forEach(cat => {
+      const g = groups[cat]
+      if (g.count > 0) g.avgClaim = Math.round(g.totalAvgClaimSum / g.count)
+      if (g.poolAmount > 0) g.usagePct = (g.claimRequestAmount / g.poolAmount) * 100
+      if (g.penaltyAmount > 0) g.statusZone = 'Penalty'
+      else if (g.usagePct > 100) g.statusZone = 'Buffer'
+    })
+    return groups
+  }, [hospital, drgGroupMode])
+
+  const chartLabels = useMemo(() => {
+    if (drgGroupMode === 'detailed') return drgList
+    return [...new Set(drgList.map(getSubCategory))]
+  }, [drgList, drgGroupMode])
+
   /* ── Build chart for single hospital (all DRGs) ────────── */
   const hospitalPolicyCompareConfig = useMemo(() => {
-    if (!hospital || !drgList.length) return null
-    const labels = drgList
+    if (!hospital || !chartLabels.length) return null
+    const labels = chartLabels
+    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
+
     const currentData = labels.map((drg) => {
-      const d = hospital.drgs[drg]
+      const d = sourceData[drg]
+      if (!d) return 0
       const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
       return Math.round(netPerClaim * d.claimCount)
     })
-    console.log("currentData")
-    console.log(allHospitals)
-    console.log(hospital)
-    console.log(hospital.drgs)
-    console.log(currentData)
     const singaporeData = labels.map((drg) => {
-      const d = hospital.drgs[drg]
+      const d = sourceData[drg]
+      if (!d) return 0
       const copay = hospital.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
       return Math.round(Math.max(0, d.avgClaim - copay) * d.claimCount)
     })
-    const chinaData = labels.map((drg) => Math.round(hospital.drgs[drg].reimbursedAmount || 0))
+    const chinaData = labels.map((drg) => {
+      const d = sourceData[drg]
+      return Math.round(d?.reimbursedAmount || 0)
+    })
 
     const datasets = []
     if (policyToggle === 'current' || policyToggle === 'singapore' || policyToggle === 'china' || policyToggle === 'both') {
@@ -281,8 +329,9 @@ export default function HospitalDashboard() {
   }, [hospital, drgList, policyToggle])
 
   const hospitalPoolConfig = useMemo(() => {
-    if (!hospital || !drgList.length) return null
-    const labels = drgList.map(shortenDRG)
+    if (!hospital || !chartLabels.length) return null
+    const labels = chartLabels.map(shortenDRG)
+    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
     return {
       type: 'bar',
       data: {
@@ -290,19 +339,19 @@ export default function HospitalDashboard() {
         datasets: [
           {
             label: 'Allocation Amount (Pool)',
-            data: drgList.map((drg) => Math.round(hospital.drgs[drg].poolAmount || 0)),
+            data: chartLabels.map((drg) => Math.round(sourceData[drg]?.poolAmount || 0)),
             backgroundColor: 'rgba(149, 165, 166, 0.75)',
             borderRadius: 4
           },
           {
             label: 'Claim Request Amount',
-            data: drgList.map((drg) => Math.round(hospital.drgs[drg].claimRequestAmount || 0)),
+            data: chartLabels.map((drg) => Math.round(sourceData[drg]?.claimRequestAmount || 0)),
             backgroundColor: 'rgba(243, 156, 18, 0.75)',
             borderRadius: 4
           },
           {
             label: 'Actual Claim Amount (Paid)',
-            data: drgList.map((drg) => Math.round(hospital.drgs[drg].reimbursedAmount || 0)),
+            data: chartLabels.map((drg) => Math.round(sourceData[drg]?.reimbursedAmount || 0)),
             backgroundColor: POLICY_COLORS.china,
             borderRadius: 4
           }
@@ -323,15 +372,16 @@ export default function HospitalDashboard() {
   }, [hospital, drgList])
 
   const hospitalPenaltyConfig = useMemo(() => {
-    if (!hospital || !drgList.length) return null
+    if (!hospital || !chartLabels.length) return null
+    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
     return {
       type: 'bar',
       data: {
-        labels: drgList.map(shortenDRG),
+        labels: chartLabels.map(shortenDRG),
         datasets: [
           {
             label: 'Penalty Amount',
-            data: drgList.map((drg) => Math.round(hospital.drgs[drg].penaltyAmount || 0)),
+            data: chartLabels.map((drg) => Math.round(sourceData[drg]?.penaltyAmount || 0)),
             backgroundColor: 'rgba(192, 57, 43, 0.8)',
             borderRadius: 4
           }
@@ -486,6 +536,16 @@ export default function HospitalDashboard() {
               ))}
             </div>
           </div>
+
+          {/* DRG Group Mode */}
+          <div style={{ flex: '1 1 200px' }}>
+            <div className="input-label" style={{ marginBottom: '0.35rem' }}>🎯 DRG Resolution</div>
+            <div className="tabs" style={{ marginBottom: 0 }}>
+              {[['detailed', '📄 Detailed'], ['category', '📁 Grouped']].map(([k, l]) => (
+                <button key={k} className={`tab ${drgGroupMode === k ? 'active' : ''}`} onClick={() => setDrgGroupMode(k)}>{l}</button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Selectors (show only relevant one) */}
@@ -591,13 +651,23 @@ export default function HospitalDashboard() {
                   <tr><th>DRG Category</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Usage %</th><th>Status</th></tr>
                 </thead>
                 <tbody>
-                  {drgList.map(drg => {
-                    const d = hospital.drgs[drg]
+                  {chartLabels.map(drg => {
+                    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
+                    const d = sourceData[drg]
                     if (!d || d.claimRequestAmount === 0) return null
                     const pct = d.enforceQuota && d.usagePct !== null ? Math.round(d.usagePct) : null
                     return (
                       <tr key={drg}>
-                        <td style={{ fontWeight: 500 }}>{shortenDRG(drg)}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            {drgGroupMode === 'detailed' && (
+                              <span className="badge badge-primary" style={{ alignSelf: 'flex-start', fontSize: '10px', padding: '2px 6px', opacity: 0.8 }}>
+                                {getSubCategory(drg)}
+                              </span>
+                            )}
+                            <span>{shortenDRG(drg)}</span>
+                          </div>
+                        </td>
                         <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
                         <td>RM {d.claimRequestAmount.toLocaleString()}</td>
                         <td>RM {d.reimbursedAmount.toLocaleString()}</td>
