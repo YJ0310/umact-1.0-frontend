@@ -109,7 +109,7 @@ export default function HospitalDashboard() {
           setYearlyPoolDetails(yearlyDetails)
 
           const mapped = hospitals.map(h => {
-            const tier = normalizeTier(h.tier)
+            const tier = normalizeTier(h.tier || h.final_tier)
             const drgs = {}
             uniqueDRGs.forEach(drg => {
               const match = hospitalDRG.find(d => d._id.hospital === h.hospital_name && d._id.drg === drg)
