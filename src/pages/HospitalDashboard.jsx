@@ -436,8 +436,13 @@ export default function HospitalDashboard() {
         },
         scales: {
           x: { title: { display: true, text: 'Amount (RM)' } },
-          y: { ticks: { font: { size: 10 } } }
-        }
+          y: { 
+            ticks: { font: { size: 11, weight: 'bold' } },
+            grid: { display: false }
+          }
+        },
+        barPercentage: 0.8,
+        categoryPercentage: 0.9
       }
     }
   }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
@@ -466,8 +471,14 @@ export default function HospitalDashboard() {
           title: { display: true, text: `${hospital.name} — Penalty Distribution (RM)` }
         },
         scales: {
-          x: { title: { display: true, text: 'Penalty (RM)' } }
-        }
+          x: { title: { display: true, text: 'Penalty (RM)' } },
+          y: { 
+            ticks: { font: { size: 11, weight: 'bold' } },
+            grid: { display: false }
+          }
+        },
+        barPercentage: 0.8,
+        categoryPercentage: 0.9
       }
     }
   }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
