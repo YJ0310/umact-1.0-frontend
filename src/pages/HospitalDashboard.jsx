@@ -782,24 +782,25 @@ export default function HospitalDashboard() {
           </div>
 
           {selectedYear === '2024' || selectedYear === '2025' ? (() => {
-            const baseYear = parseInt(selectedYear) - 1;
-            const relevantStats = boxPlotStats.filter(s => s._id.drg === selectedDRG && s._id.year === baseYear);
-            const baseVal = relevantStats.length > 0
-              ? Math.round(relevantStats.reduce((acc, s) => acc + s.median, 0) / relevantStats.length)
-              : 0;
-            const riskAdjuster = 1.05;
-            const regionalWeight = 1.02;
-            const finalQuota = Math.round(baseVal * riskAdjuster * regionalWeight);
+            const currentDRGData = yearlyPoolDetails.find(d => 
+              d._id.drg === selectedDRG && d.policyYear.toString() === selectedYear
+            );
+            
+            const baseVal = currentDRGData?.baseAmount || 0;
+            const riskAdjuster = currentDRGData?.riskAdjuster || 1.05;
+            const regionalWeight = currentDRGData?.regionalWeight || 1.02;
+            const finalQuota = currentDRGData?.poolAmount || 0;
+            const baseYear = currentDRGData?.referenceYear || (parseInt(selectedYear) - 1);
 
             return (
               <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--accent)' }}>
-                <h4 style={{ marginBottom: '1.5rem' }}>🧠 Quota Allocation Decision Engine — Real-time Logic</h4>
+                <h4 style={{ marginBottom: '1.5rem' }}>🧠 Quota Allocation Decision Engine — Transparent Logic</h4>
                 <div className="grid grid-5" style={{ gap: '1rem', textAlign: 'center' }}>
                   {[
-                    { step: '01', title: 'Historical Base', val: `RM ${baseVal.toLocaleString()}`, desc: `Based on ${baseYear} Median.` },
+                    { step: '01', title: 'Historical Base', val: `RM ${baseVal.toLocaleString()}`, desc: `Reference Mean (${baseYear}).` },
                     { step: '02', title: 'Risk Adjuster', val: `× ${riskAdjuster}`, desc: 'Actuarial inflation buffer.' },
                     { step: '03', title: 'Regional Weight', val: `× ${regionalWeight}`, desc: 'Urban cost adjustment.' },
-                    { step: '04', title: 'Final Quota', val: `RM ${finalQuota.toLocaleString()}`, desc: 'Approved money-pool per case.' },
+                    { step: '04', title: 'Final Quota', val: `RM ${finalQuota.toLocaleString()}`, desc: 'Approved money-pool (Allocation).' },
                     { step: '05', title: 'Enforcement', val: 'ACTIVE', desc: 'Live claims monitoring.' }
                   ].map((s, idx) => (
                     <div key={idx} style={{ padding: '0.75rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -811,7 +812,7 @@ export default function HospitalDashboard() {
                   ))}
                 </div>
                 <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(46, 204, 113, 0.05)', borderRadius: '8px', border: '1px dashed var(--success)', fontSize: '11px', textAlign: 'center' }}>
-                  <strong>Policy Decision:</strong> The calculated quota of <strong>RM {finalQuota.toLocaleString()}</strong> is the baseline for all claims in {selectedYear} for {shortenDRG(selectedDRG)}.
+                  <strong>System Transparency:</strong> The final allocation of <strong>RM {finalQuota.toLocaleString()}</strong> is calculated directly from the {baseYear} baseline using the multipliers shown above.
                 </div>
               </div>
             );
