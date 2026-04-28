@@ -736,7 +736,12 @@ export default function HospitalDashboard() {
             </div>
           </div>
 
+          {/* 1. Comparison Bar Chart (Top 20 Hospitals) */}
           <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <ChartComponent config={drgChartConfig} height={500} />
+          </div>
+
+          {/* 2. AgCharts Box Plot */}
             <h4 style={{ marginBottom: '1.25rem' }}>🏆 Inter-Hospital Performance Comparison</h4>
             <div style={{ height: '400px', width: '100%' }}>
               <AgCharts options={{
