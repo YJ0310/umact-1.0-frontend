@@ -48,6 +48,13 @@ function normalizeTier(value) {
   return match ? Number(match[0]) : 2
 }
 
+function shortenDRG(name) {
+  if (!name) return ''
+  const parts = name.split(' | ')
+  if (parts.length >= 3) return parts[2]
+  return name
+}
+
 /* ══════════════════════════════════════════════════════════════
    CHART COMPONENTS
    ══════════════════════════════════════════════════════════════ */
@@ -141,6 +148,12 @@ export default function HospitalDashboard() {
             return { id: h._id || h.hospital_name, name: h.hospital_name, tier, region: h.region, drgs }
           })
 
+          console.log("allHospitals")
+          console.log(result)
+          console.log(hospitals)
+          console.log(hospitalDRG)
+          console.log(mapped)
+
           setAllHospitals(mapped)
           setSelectedHospital(mapped[0]?.id || '')
           setSelectedDRG(uniqueDRGs[0] || '')
@@ -218,6 +231,11 @@ export default function HospitalDashboard() {
       const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
       return Math.round(netPerClaim * d.claimCount)
     })
+    console.log("currentData")
+    console.log(allHospitals)
+    console.log(hospital)
+    console.log(hospital.drgs)
+    console.log(currentData)
     const singaporeData = labels.map((drg) => {
       const d = hospital.drgs[drg]
       const copay = hospital.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
@@ -253,7 +271,7 @@ export default function HospitalDashboard() {
 
     return {
       type: 'bar',
-      data: { labels: labels.map(l => l.length > 16 ? l.slice(0, 14) + '…' : l), datasets },
+      data: { labels: labels.map(shortenDRG), datasets },
       options: {
         responsive: true, indexAxis: 'y',
         plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${hospital.name} — Country Comparison (Insurer Paid, RM)` } },
@@ -264,7 +282,7 @@ export default function HospitalDashboard() {
 
   const hospitalPoolConfig = useMemo(() => {
     if (!hospital || !drgList.length) return null
-    const labels = drgList.map(l => l.length > 18 ? l.slice(0, 16) + '…' : l)
+    const labels = drgList.map(shortenDRG)
     return {
       type: 'bar',
       data: {
@@ -309,7 +327,7 @@ export default function HospitalDashboard() {
     return {
       type: 'bar',
       data: {
-        labels: drgList.map(l => l.length > 18 ? l.slice(0, 16) + '…' : l),
+        labels: drgList.map(shortenDRG),
         datasets: [
           {
             label: 'Penalty Amount',
@@ -383,7 +401,7 @@ export default function HospitalDashboard() {
       data: { labels, datasets },
       options: {
         responsive: true, indexAxis: 'y',
-        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${selectedDRG} — Top 20 Hospitals Comparison (RM)` } },
+        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${shortenDRG(selectedDRG)} — Top 20 Hospitals Comparison (RM)` } },
         scales: { x: { title: { display: true, text: 'Insurer Paid Amount (RM)' } } }
       }
     }
@@ -402,7 +420,7 @@ export default function HospitalDashboard() {
     return {
       type: 'bar',
       data: {
-        labels: drgList.map(l => l.length > 14 ? l.slice(0, 12) + '…' : l),
+        labels: drgList.map(shortenDRG),
         datasets: [
           { label: 'Tier 1', data: avgByDrg(t1), backgroundColor: 'rgba(46,204,113,0.6)', borderRadius: 4 },
           { label: 'Tier 2', data: avgByDrg(t2), backgroundColor: 'rgba(231,76,60,0.6)', borderRadius: 4 },
@@ -523,7 +541,7 @@ export default function HospitalDashboard() {
             <div style={{ flex: 1 }}>
               <div className="input-label" style={{ marginBottom: '0.25rem' }}>Select DRG Category</div>
               <select className="input" value={selectedDRG} onChange={e => setSelectedDRG(e.target.value)} style={{ width: '100%' }}>
-                {drgList.map(d => <option key={d} value={d}>{d}</option>)}
+                {drgList.map(d => <option key={d} value={d}>{shortenDRG(d)}</option>)}
               </select>
             </div>
           )}
@@ -579,7 +597,7 @@ export default function HospitalDashboard() {
                     const pct = d.enforceQuota && d.usagePct !== null ? Math.round(d.usagePct) : null
                     return (
                       <tr key={drg}>
-                        <td style={{ fontWeight: 500 }}>{drg}</td>
+                        <td style={{ fontWeight: 500 }}>{shortenDRG(drg)}</td>
                         <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
                         <td>RM {d.claimRequestAmount.toLocaleString()}</td>
                         <td>RM {d.reimbursedAmount.toLocaleString()}</td>
@@ -627,7 +645,7 @@ export default function HospitalDashboard() {
                   {hospitalYearlyDetails.map((row, idx) => (
                     <tr key={`${row.policyYear}-${row._id.drg}-${idx}`}>
                       <td>{row.policyYear}</td>
-                      <td>{row._id.drg}</td>
+                      <td>{shortenDRG(row._id.drg)}</td>
                       <td>{row.enforceQuota ? `RM ${Math.round(row.poolAmount || 0).toLocaleString()}` : 'N/A'}</td>
                       <td>RM {Math.round(row.claimRequestAmount || 0).toLocaleString()}</td>
                       <td>RM {Math.round(row.penaltyAmount || 0).toLocaleString()}</td>
@@ -653,7 +671,7 @@ export default function HospitalDashboard() {
 
           {/* DRG Summary Table */}
           <div className="card">
-            <h4 style={{ marginBottom: '0.75rem' }}>📋 All Hospitals — {selectedDRG}</h4>
+            <h4 style={{ marginBottom: '0.75rem' }}>📋 All Hospitals — {shortenDRG(selectedDRG)}</h4>
             <div className="table-wrapper">
               <table>
                 <thead>
