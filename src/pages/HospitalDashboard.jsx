@@ -772,27 +772,41 @@ export default function HospitalDashboard() {
             </div>
           </div>
 
-          {(selectedYear === '2024' || selectedYear === '2025') ? (
-            <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--accent)' }}>
-              <h4 style={{ marginBottom: '1.5rem' }}>🧠 Quota Allocation Decision Engine</h4>
-              <div className="grid grid-5" style={{ gap: '1rem', textAlign: 'center' }}>
-                {[
-                  { step: '01', title: 'Historical Base', val: 'Prior Year Mean', desc: 'Avg cost per DRG.' },
-                  { step: '02', title: 'Risk Adjuster', val: '× 1.05 Buffer', desc: 'Inflation buffer.' },
-                  { step: '03', title: 'Regional Weight', val: 'Region Factor', desc: 'Locality adjustment.' },
-                  { step: '04', title: 'Final Quota', val: 'Approved RM', desc: 'Yearly money-pool.' },
-                  { step: '05', title: 'Enforcement', val: 'Daily Audit', desc: 'Live monitoring.' }
-                ].map((s, idx) => (
-                  <div key={idx} style={{ padding: '0.75rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--accent)', marginBottom: '0.5rem' }}>STEP {s.step}</div>
-                    <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)' }}>{s.title}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 600 }}>{s.val}</div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{s.desc}</div>
-                  </div>
-                ))}
+          {(selectedYear === '2024' || selectedYear === '2025') ? (() => {
+            const baseYear = parseInt(selectedYear) - 1;
+            const relevantStats = boxPlotStats.filter(s => s._id.drg === selectedDRG && s._id.year === baseYear);
+            const baseVal = relevantStats.length > 0 
+              ? Math.round(relevantStats.reduce((acc, s) => acc + s.median, 0) / relevantStats.length)
+              : 0;
+            const riskAdjuster = 1.05;
+            const regionalWeight = 1.02;
+            const finalQuota = Math.round(baseVal * riskAdjuster * regionalWeight);
+
+            return (
+              <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--accent)' }}>
+                <h4 style={{ marginBottom: '1.5rem' }}>🧠 Quota Allocation Decision Engine — Real-time Logic</h4>
+                <div className="grid grid-5" style={{ gap: '1rem', textAlign: 'center' }}>
+                  {[
+                    { step: '01', title: 'Historical Base', val: `RM ${baseVal.toLocaleString()}`, desc: `Based on ${baseYear} Median.` },
+                    { step: '02', title: 'Risk Adjuster', val: `× ${riskAdjuster}`, desc: 'Actuarial inflation buffer.' },
+                    { step: '03', title: 'Regional Weight', val: `× ${regionalWeight}`, desc: 'Urban cost adjustment.' },
+                    { step: '04', title: 'Final Quota', val: `RM ${finalQuota.toLocaleString()}`, desc: 'Approved money-pool per case.' },
+                    { step: '05', title: 'Enforcement', val: 'ACTIVE', desc: 'Live claims monitoring.' }
+                  ].map((s, idx) => (
+                    <div key={idx} style={{ padding: '0.75rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--accent)', marginBottom: '0.4rem' }}>STEP {s.step}</div>
+                      <div style={{ fontWeight: 700, fontSize: '11px', marginBottom: '0.2rem' }}>{s.title}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--success)', fontWeight: 800, marginBottom: '0.3rem' }}>{s.val}</div>
+                      <div style={{ fontSize: '9px', color: 'var(--text-muted)', lineHeight: 1.2 }}>{s.desc}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(46, 204, 113, 0.05)', borderRadius: '8px', border: '1px dashed var(--success)', fontSize: '11px', textAlign: 'center' }}>
+                  <strong>Policy Decision:</strong> The calculated quota of <strong>RM {finalQuota.toLocaleString()}</strong> is the baseline for all claims in {selectedYear} for {shortenDRG(selectedDRG)}.
+                </div>
               </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <div className="card" style={{ marginBottom: '1.25rem', textAlign: 'center', opacity: 0.6 }}>
               <p>Decision engine unavailable for Baseline/Observation years (2023).</p>
             </div>
