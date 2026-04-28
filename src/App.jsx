@@ -27,8 +27,8 @@ function Navbar() {
     <nav className="navbar">
       <div className="navbar-inner">
         <Link to="/" className="navbar-brand">
-          <span className="brand-icon">R</span>
-          RiskByte
+          <span className="brand-icon">思</span>
+          ChinShi
         </Link>
 
         <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)}>

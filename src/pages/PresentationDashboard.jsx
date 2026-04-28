@@ -114,7 +114,7 @@ export default function PresentationDashboard() {
           <h1>🎯 Executive Presentation</h1>
           <p style={{color: 'var(--text-secondary)'}}>CEO • CFO • CTO • COO aligned insights</p>
         </div>
-        <span className="badge badge-primary" style={{fontSize: '0.8rem'}}>Team RiskByte • UMACT 2026</span>
+        <span className="badge badge-primary" style={{fontSize: '0.8rem'}}>Team ChinShi • UMACT 2026</span>
       </div>
 
       <div className="tabs animate-in" style={{animationDelay: '0.05s'}}>
