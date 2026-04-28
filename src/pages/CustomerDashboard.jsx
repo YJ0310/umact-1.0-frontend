@@ -314,20 +314,16 @@ export default function CustomerDashboard() {
 
   if (showClaim && !claimSubmitted) {
     const handleSubmitClaim = async () => {
-      if (!claimForm.hospital || !claimForm.amount || !claimForm.drg) {
-        showAlert('Please select hospital, DRG, and amount.', 'warning')
+      if (!claimReceipts.length) {
+        showAlert('Please upload your invoice/receipts.', 'warning')
         return
       }
       setSubmittingClaim(true)
       const formData = new FormData()
       formData.append('firebaseUid', userData?.googleProfile?.sub || 'demo-user-123')
-      formData.append('hospitalName', claimForm.hospital)
-      formData.append('drg', claimForm.drg)
-      formData.append('admissionType', claimForm.type)
-      formData.append('admissionDate', claimForm.date)
-      formData.append('claimAmount', claimForm.amount)
-      formData.append('description', claimForm.desc)
       formData.append('planType', userData?.user?.planType || 'Basic')
+      formData.append('description', 'Auto-extracted from invoice')
+      
       claimReceipts.forEach((file) => formData.append('receipts', file))
 
       try {
@@ -351,53 +347,20 @@ export default function CustomerDashboard() {
         </button>
         <div className="card animate-in">
           <h2 style={{marginBottom: '0.5rem'}}>📝 Submit a Claim</h2>
-          <p style={{color: 'var(--text-secondary)', marginBottom: '1.5rem'}}>Fill in your claim details below.</p>
+          <p style={{color: 'var(--text-secondary)', marginBottom: '1.5rem'}}>
+            Simply upload your medical invoice.
+          </p>
           
-          <div className="input-group" style={{marginBottom: '1rem'}}>
-            <label className="input-label">Type of Visit</label>
-            <select className="input" value={claimForm.type} onChange={e => setClaimForm(f => ({...f, type: e.target.value}))}>
-              <option>Medical</option><option>Surgical</option><option>Obstetrics</option>
-            </select>
+          <div className="card card-glass" style={{ marginBottom: '1.5rem', border: '1px solid var(--accent)', background: 'var(--bg-secondary)' }}>
+            <h4 style={{ marginBottom: '0.5rem' }}>ℹ️ Important Disclaimer</h4>
+            <p style={{ fontSize: 'var(--font-size-sm)', margin: 0, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              All details will be referred directly from your uploaded invoice by the insurer. 
+              Our backend system will automatically fetch and verify the request date, hospital name, diagnosis, and bio data.
+            </p>
           </div>
-          <div className="input-group" style={{marginBottom: '1rem'}}>
-            <label className="input-label">Hospital Name</label>
-            <input
-              className="input"
-              list="hospital-list"
-              placeholder="Search hospital name"
-              value={claimForm.hospital}
-              onChange={e => setClaimForm(f => ({...f, hospital: e.target.value}))}
-            />
-            <datalist id="hospital-list">
-              {hospitals.map((h) => (
-                <option key={h._id || h.hospital_name} value={h.hospital_name} />
-              ))}
-            </datalist>
-          </div>
-          <div className="input-group" style={{marginBottom: '1rem'}}>
-            <label className="input-label">DRG (15 Core)</label>
-            <select className="input" value={claimForm.drg} onChange={e => setClaimForm(f => ({...f, drg: e.target.value}))}>
-              <option value="">Select DRG</option>
-              {drgs.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            {listsLoading && <div className="skeleton skeleton-text" style={{marginTop: '0.5rem'}} />}
-          </div>
-          <div className="input-group" style={{marginBottom: '1rem'}}>
-            <label className="input-label">Claim Amount (RM)</label>
-            <input className="input" type="number" placeholder="e.g. 15000" value={claimForm.amount} onChange={e => setClaimForm(f => ({...f, amount: e.target.value}))} />
-          </div>
-          <div className="input-group" style={{marginBottom: '1rem'}}>
-            <label className="input-label">Admission Date</label>
-            <input className="input" type="date" value={claimForm.date} onChange={e => setClaimForm(f => ({...f, date: e.target.value}))} />
-          </div>
+
           <div className="input-group" style={{marginBottom: '1.5rem'}}>
-            <label className="input-label">Description</label>
-            <textarea className="input" rows={3} placeholder="Brief description..." style={{resize: 'vertical'}} value={claimForm.desc} onChange={e => setClaimForm(f => ({...f, desc: e.target.value}))} />
-          </div>
-          <div className="input-group" style={{marginBottom: '1.5rem'}}>
-            <label className="input-label">Receipts (PDF or images)</label>
+            <label className="input-label">Invoice / Receipts (PDF or Images)</label>
             <input
               className="input"
               type="file"
@@ -406,6 +369,7 @@ export default function CustomerDashboard() {
               onChange={(e) => setClaimReceipts(Array.from(e.target.files || []))}
             />
           </div>
+
           <button className="btn btn-primary btn-block" disabled={submittingClaim} onClick={handleSubmitClaim}>
             {submittingClaim ? 'Submitting...' : 'Submit Claim →'}
           </button>
