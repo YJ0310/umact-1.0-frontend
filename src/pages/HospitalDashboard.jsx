@@ -243,12 +243,12 @@ export default function HospitalDashboard() {
     if (!hospital) return []
     return yearlyPoolDetails
       .filter((row) => row._id.hospital === hospital.name)
-      .filter((row) => selectedDetailYear === 'all' ? true : String(row.policyYear) === String(selectedDetailYear))
+      .filter((row) => selectedYear === '23-25' ? true : String(row.policyYear) === String(selectedYear))
       .sort((a, b) => {
         if (a.policyYear !== b.policyYear) return b.policyYear - a.policyYear
         return String(a._id.drg).localeCompare(String(b._id.drg))
       })
-  }, [yearlyPoolDetails, hospital, selectedDetailYear])
+  }, [yearlyPoolDetails, hospital, selectedYear])
 
   /* ── Derived tier summary ──────────────────────────────── */
   const tierSummary = useMemo(() => {
