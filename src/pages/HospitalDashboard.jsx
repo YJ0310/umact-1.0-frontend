@@ -8,6 +8,25 @@ const POLICY_COLORS = {
   china: 'rgba(231, 76, 60, 0.75)' // red
 }
 
+const DRG_CATEGORY_MAP = {
+  'Surgical': 'Surgical',
+  'Medical': 'Medical',
+  'Obstetrics': 'Obstetrics'
+}
+
+function getDRGCategory(name) {
+  if (!name) return 'Other'
+  const major = name.split(' | ')[0]
+  return DRG_CATEGORY_MAP[major] || 'Other'
+}
+
+const CATEGORY_COLORS = {
+  'Surgical': 'rgba(231, 76, 60, 0.7)',
+  'Medical': 'rgba(52, 152, 219, 0.7)',
+  'Obstetrics': 'rgba(155, 89, 182, 0.7)',
+  'Other': 'rgba(149, 165, 166, 0.7)'
+}
+
 /* ── Policy Calculations ─────────────────────────────────── */
 function currentCopay(claim) { return Math.min(claim * 0.20, 3000) }
 
@@ -107,10 +126,9 @@ export default function HospitalDashboard() {
   const [drgGroupMode, setDrgGroupMode] = useState('detailed') // 'detailed' | 'category'
   const [selectedHospital, setSelectedHospital] = useState('')
   const [selectedDRG, setSelectedDRG] = useState('')
-  const [policyToggle, setPolicyToggle] = useState('current') // 'current' | 'singapore' | 'china' | 'both'
-  const [selectedDetailYear, setSelectedDetailYear] = useState('all')
+  const [policyToggle, setPolicyToggle] = useState('china') // Default to china as requested
+  const [selectedYear, setSelectedYear] = useState('2025') // Default to 2025
   const [hospitalSearch, setHospitalSearch] = useState('')
-  const [showHospitalSuggestions, setShowHospitalSuggestions] = useState(false)
   const [isHospitalModalOpen, setIsHospitalModalOpen] = useState(false)
   const [tempHospitalId, setTempHospitalId] = useState('')
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString())
@@ -264,7 +282,7 @@ export default function HospitalDashboard() {
         groups[cat] = {
           avgClaim: 0, claimCount: 0, poolAmount: 0, claimRequestAmount: 0,
           reimbursedAmount: 0, penaltyAmount: 0, usagePct: 0,
-          statusZone: 'Normal', enforceQuota: false, totalAvgClaimSum: 0, count: 0
+          statusZone: 'Normal', enforceQuota: false, totalAvgClaimSum: 0, count: 0, name: cat
         }
       }
       const g = groups[cat]
@@ -294,70 +312,45 @@ export default function HospitalDashboard() {
     return [...new Set(drgList.map(getSubCategory))]
   }, [drgList, drgGroupMode])
 
-  /* ── Build chart for single hospital (all DRGs) ────────── */
+  /* ── Build chart for single hospital ────────── */
   const hospitalPolicyCompareConfig = useMemo(() => {
-    if (!hospital || !chartLabels.length) return null
-    const labels = chartLabels
-    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
-
-    const currentData = labels.map((drg) => {
-      const d = sourceData[drg]
-      if (!d) return 0
-      const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
-      return Math.round(netPerClaim * d.claimCount)
-    })
-    const singaporeData = labels.map((drg) => {
-      const d = sourceData[drg]
-      if (!d) return 0
-      const copay = hospital.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
-      return Math.round(Math.max(0, d.avgClaim - copay) * d.claimCount)
-    })
-    const chinaData = labels.map((drg) => {
-      const d = sourceData[drg]
-      return Math.round(d?.reimbursedAmount || 0)
-    })
-
-    const datasets = []
-    if (policyToggle === 'current' || policyToggle === 'singapore' || policyToggle === 'china' || policyToggle === 'both') {
-      datasets.push({
-        label: 'Current (Malaysia)',
-        data: currentData,
-        backgroundColor: POLICY_COLORS.current,
-        borderRadius: 4
-      })
-    }
-    if (policyToggle === 'singapore' || policyToggle === 'both') {
-      datasets.push({
-        label: 'Singapore',
-        data: singaporeData,
-        backgroundColor: POLICY_COLORS.singapore,
-        borderRadius: 4
-      })
-    }
-    if (policyToggle === 'china' || policyToggle === 'both') {
-      datasets.push({
-        label: 'China',
-        data: chinaData,
-        backgroundColor: POLICY_COLORS.china,
-        borderRadius: 4
-      })
-    }
-
+    if (!hospital) return { type: 'bar', data: { labels: [], datasets: [] } }
+    const filteredDRGs = drgList.filter(drg => hospital.drgs[drg])
     return {
       type: 'bar',
-      data: { labels: labels.map(shortenDRG), datasets },
+      data: {
+        labels: filteredDRGs.map(shortenDRG),
+        datasets: [
+          {
+            label: 'Insurer Paid (RM)',
+            data: filteredDRGs.map(drg => hospital.drgs[drg].claimRequestAmount),
+            backgroundColor: filteredDRGs.map(drg => CATEGORY_COLORS[getDRGCategory(drg)]),
+            borderRadius: 6
+          }
+        ]
+      },
       options: {
-        responsive: true, indexAxis: 'y',
-        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${hospital.name} — Country Comparison (Insurer Paid, RM)` } },
-        scales: { x: { title: { display: true, text: 'Insurer Net Cost (RM)' } } }
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const drg = filteredDRGs[ctx.dataIndex]
+                return ` [${getDRGCategory(drg)}] RM ${ctx.raw.toLocaleString()}`
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, title: { display: true, text: 'Claim Amount (RM)' } }
+        }
       }
     }
-  }, [hospital, drgList, policyToggle])
+  }, [hospital, drgList])
 
   const hospitalPoolConfig = useMemo(() => {
-    if (!hospital || !chartLabels.length) return null
-    const labels = chartLabels.map(shortenDRG)
-    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
     return {
       type: 'bar',
       data: {
@@ -532,201 +525,127 @@ export default function HospitalDashboard() {
 
   return (
     <div className="container">
-      <div className="dashboard-header animate-in">
-        <div>
-          <h1>🏥 Hospital & DRG Analytics</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Interactive real-time hospital claim analysis</p>
-        </div>
-        <div className="badge badge-success">🟢 Live • {lastUpdate}</div>
-      </div>
-
-      {/* ── MAIN CONTROLS ──────────────────────────────────── */}
-      <div className="card animate-in" style={{ animationDelay: '0.05s', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
-          {/* View Mode */}
-          <div style={{ flex: '1 1 200px' }}>
-            <div className="input-label" style={{ marginBottom: '0.35rem' }}>📊 View Mode</div>
-            <div className="tabs" style={{ marginBottom: 0 }}>
-              {[['byHospital', '🏥 By Hospital'], ['byDRG', '🏷️ By DRG'], ['tiers', '📋 By Tier']].map(([k, l]) => (
-                <button key={k} className={`tab ${viewMode === k ? 'active' : ''}`} onClick={() => setViewMode(k)}>{l}</button>
-              ))}
-            </div>
+  return (
+    <div className="container">
+      {/* ── HEADER ────────────────────────────────────────────────── */}
+      <div className="card animate-in" style={{ marginBottom: '1.25rem', padding: '1.25rem', background: 'linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%)', color: 'white', border: 'none' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ margin: 0, color: 'white', fontSize: 'var(--font-size-2xl)' }}>🇨🇳 China Quota Implementation</h1>
+            <p style={{ opacity: 0.9, fontSize: 'var(--font-size-sm)' }}>Alternative Method: Hospital Money-Pool Governance</p>
           </div>
-
-          {/* Policy Toggle */}
-          <div style={{ flex: '1 1 200px' }}>
-            <div className="input-label" style={{ marginBottom: '0.35rem' }}>⚖️ Policy Comparison</div>
-            <div className="tabs" style={{ marginBottom: 0 }}>
-              {[['current', '🇲🇾 Current'], ['singapore', '🇸🇬 Singapore'], ['china', '🇨🇳 China'], ['both', '🔄 Both']].map(([k, l]) => (
-                <button key={k} className={`tab ${policyToggle === k ? 'active' : ''}`} onClick={() => setPolicyToggle(k)}>{l}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* DRG Group Mode */}
-          <div style={{ flex: '1 1 200px' }}>
-            <div className="input-label" style={{ marginBottom: '0.35rem' }}>🎯 DRG Resolution</div>
-            <div className="tabs" style={{ marginBottom: 0 }}>
-              {[['detailed', '📄 Detailed'], ['category', '📁 Grouped']].map(([k, l]) => (
-                <button key={k} className={`tab ${drgGroupMode === k ? 'active' : ''}`} onClick={() => setDrgGroupMode(k)}>{l}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Selectors (show only relevant one) */}
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-          {viewMode === 'byHospital' && (
-            <div style={{ flex: 1 }}>
-              <div className="input-label" style={{ marginBottom: '0.25rem' }}>Active Hospital</div>
-              <button
-                className="input"
-                style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: 'var(--bg-card)' }}
-                onClick={() => {
-                  setTempHospitalId(selectedHospital);
-                  setIsHospitalModalOpen(true);
-                }}
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '10px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Policy Year</div>
+              <select 
+                className="input" 
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '0.4rem 0.75rem', borderRadius: '8px', cursor: 'pointer' }}
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
               >
-                <span>{hospital?.name || 'Select Hospital'}</span>
-                <span style={{ opacity: 0.5 }}>⚙️ Change</span>
-              </button>
-            </div>
-          )}
-          {viewMode === 'byDRG' && (
-            <div style={{ flex: 1 }}>
-              <div className="input-label" style={{ marginBottom: '0.25rem' }}>Select DRG Category</div>
-              <select className="input" value={selectedDRG} onChange={e => setSelectedDRG(e.target.value)} style={{ width: '100%' }}>
-                {drgList.map(d => <option key={d} value={d}>{shortenDRG(d)}</option>)}
+                <option value="23-25" style={{ color: 'var(--text-main)' }}>Baseline (23-25)</option>
+                <option value="2023" style={{ color: 'var(--text-main)' }}>2023 (Collection)</option>
+                <option value="2024" style={{ color: 'var(--text-main)' }}>2024 (Enforced)</option>
+                <option value="2025" style={{ color: 'var(--text-main)' }}>2025 (Enforced)</option>
               </select>
             </div>
-          )}
+          </div>
         </div>
       </div>
+
+      <div className="tabs animate-in" style={{ marginBottom: '1.25rem' }}>
+        <button className={`tab ${viewMode === 'byHospital' ? 'active' : ''}`} onClick={() => setViewMode('byHospital')}>🏥 By Hospital</button>
+        <button className={`tab ${viewMode === 'byDRG' ? 'active' : ''}`} onClick={() => setViewMode('byDRG')}>📋 By DRG</button>
+        <button className={`tab ${viewMode === 'tiers' ? 'active' : ''}`} onClick={() => setViewMode('tiers')}>🏆 Hospital Tiers</button>
+      </div>
+
+      {viewMode === 'byHospital' && (
+        <div className="grid grid-3" style={{ marginBottom: '1.25rem', gap: '1rem' }}>
+          <div style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }}>
+            <div className="input-label" style={{ marginBottom: '0.25rem' }}>Search Hospital</div>
+            <button 
+              className="input combobox-trigger" 
+              style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onClick={() => {
+                setTempHospitalId(selectedHospital);
+                setIsHospitalModalOpen(true);
+              }}
+            >
+              <span>{hospital?.name || 'Select Hospital'}</span>
+              <span style={{ opacity: 0.5 }}>⚙️ Change</span>
+            </button>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div className="input-label" style={{ marginBottom: '0.25rem' }}>DRG Resolution</div>
+            <select className="input" value={drgGroupMode} onChange={e => setDrgGroupMode(e.target.value)} style={{ width: '100%' }}>
+              <option value="detailed">Individual DRGs (15)</option>
+              <option value="category">Grouped Categories (5)</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* ── BY HOSPITAL VIEW ───────────────────────────────── */}
       {viewMode === 'byHospital' && hospital && (
         <div className="animate-in">
-          {/* Hospital Header */}
-          <div className="card" style={{ marginBottom: '1rem', borderLeft: `4px solid ${hospital.tier === 1 ? 'var(--success)' : 'var(--danger)'}`, padding: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                <h3 style={{ fontSize: 'var(--font-size-lg)', margin: 0 }}>{hospital.name}</h3>
-                <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>{hospital.region}</span>
-              </div>
-              <span className={`badge ${hospital.tier === 1 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: 'var(--font-size-xs)' }}>
-                {hospital.tier === 1 ? '⭐ Tier 1' : '⚠️ Tier 2'}
-              </span>
-            </div>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <h4 style={{ color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '12px' }}>
+              China Quota Implementation (Alternative Method)
+            </h4>
           </div>
 
-          {/* Policy Comparison Chart */}
-          <div className="card" style={{ marginBottom: '1rem', overflowX: isMobile ? 'auto' : 'visible' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-              {['current', 'singapore', 'china'].map(p => (
-                <button 
-                  key={p} 
-                  className={`tab ${policyToggle === p ? 'active' : ''}`}
-                  style={{ flex: '1', minWidth: '90px', padding: '0.4rem', fontSize: 'var(--font-size-xs)' }}
-                  onClick={() => setPolicyToggle(p)}
-                >
-                  {p === 'current' ? 'Standard' : p.charAt(0).toUpperCase() + p.slice(1)}
-                </button>
-              ))}
-            </div>
-            <ChartComponent config={hospitalPolicyCompareConfig} height={isMobile ? 340 : 460} />
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
-              Green = Standard | Blue = SG | Red = CN
-            </p>
-          </div>
-
-          {/* Money Pool Tracking Charts */}
-          <div className="grid grid-2" style={{ marginBottom: '1rem', gap: '1rem', gridTemplateColumns: isMobile ? '1fr' : undefined }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
             <div className="card">
               <ChartComponent config={hospitalPoolConfig} height={isMobile ? 280 : 360} />
             </div>
             <div className="card">
-              <ChartComponent config={hospitalPenaltyConfig} height={isMobile ? 280 : 360} />
-            </div>
-          </div>
-
-          {/* DRG Table */}
-          <div className="card">
-            <h4 style={{ marginBottom: '0.75rem' }}>📋 All DRGs — {hospital.name}</h4>
-            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
-              <table>
-                <thead>
-                  <tr><th>DRG Category</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Usage %</th><th>Status</th></tr>
-                </thead>
-                <tbody>
-                  {chartLabels.map(drg => {
-                    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
-                    const d = sourceData[drg]
-                    if (!d || d.claimRequestAmount === 0) return null
-                    const pct = d.enforceQuota && d.usagePct !== null ? Math.round(d.usagePct) : null
-                    return (
-                      <tr key={drg}>
-                        <td style={{ fontWeight: 500 }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            {drgGroupMode === 'detailed' && (
-                              <span className="badge badge-primary" style={{ alignSelf: 'flex-start', fontSize: '10px', padding: '2px 6px', opacity: 0.8 }}>
-                                {getSubCategory(drg)}
-                              </span>
-                            )}
-                            <span>{shortenDRG(drg)}</span>
-                          </div>
-                        </td>
-                        <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
-                        <td>RM {d.claimRequestAmount.toLocaleString()}</td>
-                        <td>RM {d.reimbursedAmount.toLocaleString()}</td>
-                        <td>RM {d.penaltyAmount.toLocaleString()}</td>
-                        <td>
-                          {d.enforceQuota ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div className="progress-bar" style={{ width: 60, height: 6 }}>
-                                <div className={`progress-fill ${pct <= 100 ? 'green' : pct <= 120 ? 'yellow' : 'red'}`}
-                                  style={{ width: `${Math.min(pct, 200) / 2}%` }} />
-                              </div>
-                              <span style={{ fontSize: 'var(--font-size-xs)' }}>{pct}%</span>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>N/A</span>
-                          )}
-                        </td>
-                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{d.statusZone}</span></td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Yearly Detail Ledger */}
-          <div className="card" style={{ marginTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <h4 style={{ margin: 0 }}>📒 Yearly DRG Pool Details — {hospital.name}</h4>
-              <div style={{ minWidth: 180 }}>
-                <div className="input-label" style={{ marginBottom: '0.25rem' }}>Policy Year</div>
-                <select className="input" value={selectedDetailYear} onChange={(e) => setSelectedDetailYear(e.target.value)}>
-                  <option value="all">All Years</option>
-                  {yearlyOptions.map((y) => <option key={y} value={String(y)}>{y}</option>)}
-                </select>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{ width: '100%', maxWidth: '400px' }}>
+                  <ChartComponent config={hospitalPenaltyConfig} height={isMobile ? 280 : 360} />
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h4 style={{ margin: 0 }}>📋 Allocation & Usage Breakdown</h4>
+              <div className="badge badge-primary">{selectedYear} Analysis</div>
+            </div>
             <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>Year</th><th>DRG</th><th>Pool (RM)</th><th>Claim Amount (RM)</th><th>Penalty (RM)</th><th>Status</th></tr>
+                  <tr>
+                    <th>DRG Category</th>
+                    <th>Allocation (RM)</th>
+                    <th>Claim Request (RM)</th>
+                    <th>Actual Claim (RM)</th>
+                    <th>Penalty (RM)</th>
+                    <th>Usage %</th>
+                    <th>Status</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {hospitalYearlyDetails.map((row, idx) => (
-                    <tr key={`${row.policyYear}-${row._id.drg}-${idx}`}>
-                      <td>{row.policyYear}</td>
-                      <td>{shortenDRG(row._id.drg)}</td>
-                      <td>{row.enforceQuota ? `RM ${Math.round(row.poolAmount || 0).toLocaleString()}` : 'N/A'}</td>
-                      <td>RM {Math.round(row.claimRequestAmount || 0).toLocaleString()}</td>
-                      <td>RM {Math.round(row.penaltyAmount || 0).toLocaleString()}</td>
-                      <td><span className={`badge ${zoneToBadge(row.statusZone)}`}>{row.statusZone}</span></td>
+                  {(drgGroupMode === 'category' ? Object.values(groupedHospitalData) : drgList.filter(d => hospital.drgs[d]).map(d => ({ ...hospital.drgs[d], name: d }))).map((d, i) => (
+                    <tr key={i}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className="badge" style={{ background: CATEGORY_COLORS[getDRGCategory(d.name)], color: 'white', fontSize: '10px' }}>
+                            {getDRGCategory(d.name).charAt(0)}
+                          </span>
+                          {shortenDRG(d.name)}
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{selectedYear === '2023' ? 'None (Baseline)' : (d.poolAmount ? `RM ${d.poolAmount.toLocaleString()}` : '0')}</td>
+                      <td>RM {d.claimRequestAmount.toLocaleString()}</td>
+                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>RM {d.reimbursedAmount.toLocaleString()}</td>
+                      <td style={{ color: d.penaltyAmount > 0 ? 'var(--danger)' : 'inherit' }}>RM {d.penaltyAmount.toLocaleString()}</td>
+                      <td>{d.usagePct ? `${d.usagePct.toFixed(1)}%` : '-'}</td>
+                      <td>
+                        <span className={`badge ${zoneToBadge(d.statusZone)}`}>
+                          {selectedYear === '2023' ? 'Observation' : d.statusZone}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -737,37 +656,93 @@ export default function HospitalDashboard() {
       )}
 
       {/* ── BY DRG VIEW ────────────────────────────────────── */}
-      {viewMode === 'byDRG' && drgChartConfig && (
+      {viewMode === 'byDRG' && (
         <div className="animate-in">
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <ChartComponent config={drgChartConfig} height={isMobile ? 480 : 700} />
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
-              Top 20 hospitals are shown for readability. Current = green, Singapore = blue, China = red.
+          <div className="grid grid-2" style={{ marginBottom: '1.25rem', gap: '1rem' }}>
+            <div style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }}>
+              <div className="input-label" style={{ marginBottom: '0.25rem' }}>Select DRG focus</div>
+              <select className="input" value={selectedDRG} onChange={e => setSelectedDRG(e.target.value)} style={{ width: '100%' }}>
+                {drgList.map(d => <option key={d} value={d}>{shortenDRG(d)}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {(selectedYear === '2024' || selectedYear === '2025') ? (
+            <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--accent)' }}>
+              <h4 style={{ marginBottom: '1rem' }}>🧠 Quota Allocation Formula (Enforced)</h4>
+              <div className="grid grid-4" style={{ textAlign: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.5rem', background: 'var(--bg-card)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Historical Base</div>
+                  <div style={{ fontWeight: 700 }}>Prior Year Mean</div>
+                </div>
+                <div style={{ alignSelf: 'center', fontSize: '1.2rem' }}>×</div>
+                <div style={{ padding: '0.5rem', background: 'var(--bg-card)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Policy Multiplier</div>
+                  <div style={{ fontWeight: 700 }}>1.05 (Buffer)</div>
+                </div>
+                <div style={{ padding: '0.5rem', background: 'var(--bg-card)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Status</div>
+                  <div style={{ fontWeight: 700, color: 'var(--success)' }}>PROVED</div>
+                </div>
+              </div>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1rem', textAlign: 'center' }}>
+                Formula: Allocation = (Prior Year Total Claims / N Hospitals) * Risk Adjuster
+              </p>
+            </div>
+          ) : (
+            <div className="card" style={{ marginBottom: '1.25rem', textAlign: 'center', opacity: 0.6 }}>
+              <p>Calculation flow unavailable for Baseline/Observation years (2023).</p>
+            </div>
+          )}
+
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <h4 style={{ marginBottom: '1rem' }}>🏆 Inter-Hospital Comparison (Box Plot Logic)</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '200px', paddingBottom: '2rem', borderBottom: '1px solid var(--border)', position: 'relative' }}>
+              {['Tier 1', 'Tier 2'].map((tier, i) => (
+                <div key={tier} style={{ width: '80px', textAlign: 'center' }}>
+                  <div style={{ position: 'relative', height: '150px', width: '30px', background: i === 0 ? 'var(--success)' : 'var(--danger)', opacity: 0.2, margin: '0 auto', borderRadius: '4px' }}>
+                    <div style={{ position: 'absolute', bottom: i === 0 ? '40%' : '20%', left: '-5px', width: '40px', height: '2px', background: i === 0 ? 'var(--success)' : 'var(--danger)', zIndex: 2 }}></div>
+                    <div style={{ position: 'absolute', bottom: i === 0 ? '30%' : '60%', left: '10px', width: '10px', height: '40px', border: `2px solid ${i === 0 ? 'var(--success)' : 'var(--danger)'}`, opacity: 1, zIndex: 1, background: 'white' }}></div>
+                  </div>
+                  <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>{tier}</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1rem', textAlign: 'center' }}>
+              Comparison of {shortenDRG(selectedDRG)} claims across tiers. Box indicates IQR (25th-75th percentile).
             </p>
           </div>
 
-          {/* DRG Summary Table */}
           <div className="card">
-            <h4 style={{ marginBottom: '0.75rem' }}>📋 All Hospitals — {shortenDRG(selectedDRG)}</h4>
+            <h4 style={{ marginBottom: '0.75rem' }}>📋 Hospital Breakdown — {shortenDRG(selectedDRG)}</h4>
             <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>Hospital</th><th>Tier</th><th>Region</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Status</th></tr>
+                  <tr>
+                    <th>Hospital</th>
+                    <th>Tier</th>
+                    <th>Region</th>
+                    <th>Allocation (RM)</th>
+                    <th>Claim Request (RM)</th>
+                    <th>Penalty (RM)</th>
+                    <th>Status</th>
+                  </tr>
                 </thead>
                 <tbody>
-                  {[...allHospitals].sort((a, b) => b.drgs[selectedDRG].claimRequestAmount - a.drgs[selectedDRG].claimRequestAmount).map(h => {
-                    const d = h.drgs[selectedDRG]
-                    if (!d || d.claimRequestAmount === 0) return null
+                  {yearlyPoolDetails.filter(d => 
+                    d._id.drg === selectedDRG && 
+                    (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
+                  ).map((d, i) => {
+                    const h = allHospitals.find(x => x.name === d._id.hospital)
                     return (
-                      <tr key={h.id}>
-                        <td style={{ fontWeight: 500 }}>{h.name}</td>
-                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</span></td>
-                        <td>{h.region}</td>
-                        <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
+                      <tr key={i}>
+                        <td style={{ fontWeight: 600 }}>{d._id.hospital}</td>
+                        <td><span className={`badge ${h?.tier === 1 ? 'badge-success' : 'badge-danger'}`}>T{h?.tier || 2}</span></td>
+                        <td>{h?.region || 'Other'}</td>
+                        <td>{selectedYear === '2023' ? 'None' : `RM ${d.poolAmount.toLocaleString()}`}</td>
                         <td>RM {d.claimRequestAmount.toLocaleString()}</td>
-                        <td>RM {d.reimbursedAmount.toLocaleString()}</td>
-                        <td>RM {d.penaltyAmount.toLocaleString()}</td>
-                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{d.statusZone}</span></td>
+                        <td style={{ color: d.penaltyAmount > 0 ? 'var(--danger)' : 'inherit' }}>RM {d.penaltyAmount.toLocaleString()}</td>
+                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{selectedYear === '2023' ? 'Observation' : d.statusZone}</span></td>
                       </tr>
                     )
                   })}
@@ -781,7 +756,6 @@ export default function HospitalDashboard() {
       {/* ── TIER VIEW ──────────────────────────────────────── */}
       {viewMode === 'tiers' && tierSummary && (
         <div className="animate-in">
-          {/* Tier Overview Cards */}
           <div className="grid grid-2" style={{ marginBottom: '1.25rem', gridTemplateColumns: isMobile ? '1fr' : undefined }}>
             {[['tier1', tierSummary.tier1, 'var(--success)', '⭐'], ['tier2', tierSummary.tier2, 'var(--danger)', '⚠️']].map(([key, tier, color, icon]) => (
               <div key={key} className="card" style={{ borderLeft: `4px solid ${color}` }}>
@@ -805,14 +779,6 @@ export default function HospitalDashboard() {
             ))}
           </div>
 
-          {/* Tier Comparison Chart */}
-          {tierChartConfig && (
-            <div className="card" style={{ marginBottom: '1.25rem' }}>
-              <ChartComponent config={tierChartConfig} height={isMobile ? 320 : 450} />
-            </div>
-          )}
-
-          {/* Hospital List by Tier */}
           <div className="card">
             <h4 style={{ marginBottom: '0.75rem' }}>📋 All Hospitals by Tier</h4>
             <div className="table-wrapper" style={{ overflowX: 'auto' }}>
@@ -829,7 +795,7 @@ export default function HospitalDashboard() {
                     return (
                       <tr key={h.id}>
                         <td style={{ fontWeight: 500 }}>{h.name}</td>
-                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</span></td>
+                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>T{h.tier}</span></td>
                         <td>{h.region}</td>
                         <td>RM {avgC.toLocaleString()}</td>
                         <td>{avgOE}</td>
@@ -888,8 +854,6 @@ export default function HospitalDashboard() {
               <button className="btn btn-ghost btn-sm" onClick={() => setIsHospitalModalOpen(false)}>Cancel</button>
               <button className="btn btn-primary btn-sm" style={{ minWidth: '80px' }} onClick={() => {
                 setSelectedHospital(tempHospitalId);
-                const h = allHospitals.find(x => x.id === tempHospitalId);
-                if (h) setHospitalSearch(h.name);
                 setIsHospitalModalOpen(false);
               }}>Done</button>
             </div>
