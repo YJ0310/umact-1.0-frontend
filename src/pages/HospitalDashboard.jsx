@@ -114,7 +114,7 @@ function ChartComponent({ config, height = 300 }) {
     })
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [JSON.stringify(config)])
-  
+
   return <div style={{ height: currentHeight, width: '100%', position: 'relative' }}><canvas ref={ref} /></div>
 }
 
@@ -123,7 +123,7 @@ function UsageBar({ pct }) {
   let color = 'var(--success)'
   if (safePct > 120) color = 'var(--danger)'
   else if (safePct > 100) color = 'var(--warning)'
-  
+
   return (
     <div style={{ width: '100%', minWidth: '60px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
@@ -450,57 +450,6 @@ export default function HospitalDashboard() {
     }
   }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
 
-  const hospitalPolicyCompareConfig = useMemo(() => {
-    if (!hospital || !chartLabels.length) return null
-    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
-    
-    return {
-      type: 'bar',
-      data: {
-        labels: chartLabels.map(shortenDRG),
-        datasets: [
-          {
-            label: 'Current (Malaysia)',
-            data: chartLabels.map(drg => {
-              const d = sourceData[drg]
-              const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
-              return Math.round(netPerClaim * d.claimCount)
-            }),
-            backgroundColor: POLICY_COLORS.current,
-            borderRadius: 4
-          },
-          {
-            label: 'Singapore Model',
-            data: chartLabels.map(drg => {
-              const d = sourceData[drg]
-              const copay = hospital.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
-              return Math.round(Math.max(0, d.avgClaim - copay) * d.claimCount)
-            }),
-            backgroundColor: POLICY_COLORS.singapore,
-            borderRadius: 4
-          },
-          {
-            label: 'China Model (Quota)',
-            data: chartLabels.map(drg => Math.round(sourceData[drg]?.reimbursedAmount || 0)),
-            backgroundColor: POLICY_COLORS.china,
-            borderRadius: 4
-          }
-        ]
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        plugins: {
-          legend: { position: 'bottom' },
-          title: { display: true, text: `${hospital.name} — Policy Savings Comparison (RM)` }
-        },
-        scales: {
-          x: { title: { display: true, text: 'Insurer Paid Amount (RM)' } }
-        }
-      }
-    }
-  }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
-
   /* ── Build chart for single DRG (all hospitals) ────────── */
   const drgChartConfig = useMemo(() => {
     if (!allHospitals.length || !selectedDRG) return null
@@ -616,8 +565,8 @@ export default function HospitalDashboard() {
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div style={{ textAlign: 'right' }}>
               <div className="input-label" style={{ marginBottom: '0.35rem', color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>📅 Policy Year</div>
-              <select 
-                className="input" 
+              <select
+                className="input"
                 style={{ background: 'rgba(255,255,255,1)', border: 'none', color: 'var(--text-main)', padding: '0.5rem 0.85rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
@@ -758,13 +707,13 @@ export default function HospitalDashboard() {
             <div style={{ height: '300px', width: '100%', position: 'relative', borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '1rem 0 3rem 4rem' }}>
               <div style={{ position: 'absolute', left: 0, top: '25%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: 600 }}>Tier 1</div>
               <div style={{ position: 'absolute', left: 0, top: '75%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: 600 }}>Tier 2</div>
-              
+
               {[1, 2].map((tier, i) => {
                 const stats = boxPlotStats.find(s => s._id.drg === selectedDRG && s._id.tier === tier && s._id.year === parseInt(selectedYear === '23-25' ? '2025' : selectedYear))
                 if (!stats) return <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: '10%', color: 'var(--text-muted)' }}>No data for Tier {tier}</div>
-                
+
                 const scale = (val) => `${((val - stats.min) / (stats.max - stats.min || 1)) * 80 + 10}%`
-                
+
                 return (
                   <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: 0, right: 0, height: '40px', transform: 'translateY(-50%)' }}>
                     <div style={{ position: 'absolute', left: scale(stats.min), right: `calc(100% - ${scale(stats.max)})`, top: '50%', height: '1px', background: 'var(--text-main)' }}></div>
@@ -776,7 +725,7 @@ export default function HospitalDashboard() {
                   </div>
                 )
               })}
-              
+
               <div style={{ position: 'absolute', bottom: '10px', left: '10%', right: '10%', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
                 <span>Min</span><span>Q1</span><span>Median</span><span>Q3</span><span>Max</span>
               </div>
@@ -819,7 +768,7 @@ export default function HospitalDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {yearlyPoolDetails.filter(d => 
+                  {yearlyPoolDetails.filter(d =>
                     d._id.drg === selectedDRG && (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
                   ).map((d, i) => {
                     const h = allHospitals.find(x => x.name === d._id.hospital)
