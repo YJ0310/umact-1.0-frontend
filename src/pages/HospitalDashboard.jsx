@@ -351,13 +351,15 @@ export default function HospitalDashboard() {
   }, [hospital, drgList])
 
   const hospitalPoolConfig = useMemo(() => {
+    if (!hospital || !chartLabels.length) return null
+    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
     return {
       type: 'bar',
       data: {
-        labels,
+        labels: chartLabels.map(shortenDRG),
         datasets: [
           {
-            label: 'Allocation Amount (Pool)',
+            label: 'Allocation Amount',
             data: chartLabels.map((drg) => Math.round(sourceData[drg]?.poolAmount || 0)),
             backgroundColor: 'rgba(149, 165, 166, 0.75)',
             borderRadius: 4
@@ -380,7 +382,7 @@ export default function HospitalDashboard() {
         responsive: true,
         plugins: {
           legend: { position: 'bottom' },
-          title: { display: true, text: `${hospital.name} — DRG Money Pool Tracking (RM)` }
+          title: { display: true, text: `${hospital.name} — Money Pool Allocation Tracking (RM)` }
         },
         scales: {
           y: { title: { display: true, text: 'Amount (RM)' } },
@@ -388,7 +390,7 @@ export default function HospitalDashboard() {
         }
       }
     }
-  }, [hospital, drgList])
+  }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
 
   const hospitalPenaltyConfig = useMemo(() => {
     if (!hospital || !chartLabels.length) return null
@@ -418,7 +420,7 @@ export default function HospitalDashboard() {
         }
       }
     }
-  }, [hospital, drgList])
+  }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
 
   /* ── Build chart for single DRG (all hospitals) ────────── */
   const drgChartConfig = useMemo(() => {
