@@ -1185,9 +1185,26 @@ tr:hover td {
   gap: 1.25rem;
 }
 
+/* ── Responsive Overrides ───────────────────────────────────── */
+@media (max-width: 768px) {
+  .page { padding: calc(var(--header-height) + 1rem) 0 1.5rem; }
+  .container { padding: 0 1rem; }
+  .section-title { font-size: var(--font-size-xl); }
+  .card { padding: 1.25rem; }
+  
+  /* Stack grid items */
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  
+  /* Tables */
+  th, td { padding: 0.5rem 0.75rem; font-size: 0.8rem; }
+}
+
 @media (max-width: 480px) {
-  .chart-grid { grid-template-columns: 1fr; }
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .section-title { font-size: var(--font-size-lg); }
+  .card { padding: 1rem; }
+  .btn { padding: 0.6rem 1rem; font-size: var(--font-size-sm); min-height: 44px; }
+  .tabs { gap: 0.1rem; padding: 0.15rem; }
+  .tab { padding: 0.5rem 0.75rem; font-size: var(--font-size-xs); }
 }
 
 /* ── Divider ────────────────────────────────────────────────── */

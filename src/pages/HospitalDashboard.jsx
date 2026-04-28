@@ -68,13 +68,29 @@ function getSubCategory(name) {
 function ChartComponent({ config, height = 300 }) {
   const ref = useRef(null)
   const chartRef = useRef(null)
+  const [currentHeight, setCurrentHeight] = useState(height)
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setCurrentHeight(Math.min(height, 300))
+      } else {
+        setCurrentHeight(height)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    handleResize()
+    return () => window.removeEventListener('resize', handleResize)
+  }, [height])
+
   useEffect(() => {
     if (chartRef.current) chartRef.current.destroy()
     if (!ref.current) return
     chartRef.current = new Chart(ref.current.getContext('2d'), config)
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [JSON.stringify(config)])
-  return <canvas ref={ref} style={{ maxHeight: height }} />
+  
+  return <canvas ref={ref} style={{ maxHeight: currentHeight }} />
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -583,13 +599,13 @@ export default function HospitalDashboard() {
       {viewMode === 'byHospital' && hospital && (
         <div className="animate-in">
           {/* Hospital Header */}
-          <div className="card" style={{ marginBottom: '1rem', borderLeft: `4px solid ${hospital.tier === 1 ? 'var(--success)' : 'var(--danger)'}` }}>
+          <div className="card" style={{ marginBottom: '1rem', borderLeft: `4px solid ${hospital.tier === 1 ? 'var(--success)' : 'var(--danger)'}`, padding: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
-                <h3>{hospital.name}</h3>
-                <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>{hospital.region}</span>
+                <h3 style={{ fontSize: 'var(--font-size-lg)', margin: 0 }}>{hospital.name}</h3>
+                <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>{hospital.region}</span>
               </div>
-              <span className={`badge ${hospital.tier === 1 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: 'var(--font-size-sm)' }}>
+              <span className={`badge ${hospital.tier === 1 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: 'var(--font-size-xs)' }}>
                 {hospital.tier === 1 ? '⭐ Tier 1' : '⚠️ Tier 2'}
               </span>
             </div>
@@ -597,9 +613,21 @@ export default function HospitalDashboard() {
 
           {/* Policy Comparison Chart */}
           <div className="card" style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+              {['current', 'singapore', 'china'].map(p => (
+                <button 
+                  key={p} 
+                  className={`tab ${policyToggle === p ? 'active' : ''}`}
+                  style={{ flex: '1', minWidth: '90px', padding: '0.4rem', fontSize: 'var(--font-size-xs)' }}
+                  onClick={() => setPolicyToggle(p)}
+                >
+                  {p === 'current' ? 'Standard' : p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
             <ChartComponent config={hospitalPolicyCompareConfig} height={460} />
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
-              Current = green, Singapore = blue, China = red
+              Green = Standard | Blue = SG | Red = CN
             </p>
           </div>
 
@@ -810,17 +838,17 @@ export default function HospitalDashboard() {
       {/* ── Hospital Selection Modal ────────────────────────────── */}
       {isHospitalModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content animate-in">
+          <div className="modal-content animate-in" style={{ maxWidth: '500px' }}>
             <div className="modal-header">
-              <h3>🏥 Select Hospital</h3>
+              <h3 style={{ fontSize: 'var(--font-size-lg)' }}>🏥 Select Hospital</h3>
               <button className="modal-close" onClick={() => setIsHospitalModalOpen(false)}>×</button>
             </div>
 
-            <div className="modal-body">
-              <div className="combobox-wrapper" style={{ marginBottom: '1.5rem' }}>
+            <div className="modal-body" style={{ padding: '1rem' }}>
+              <div className="combobox-wrapper" style={{ marginBottom: '1rem' }}>
                 <input
                   className="input combobox-input"
-                  placeholder="Search 60+ hospitals by name or region..."
+                  placeholder="Search name or region..."
                   autoFocus
                   value={hospitalSearch}
                   onChange={(e) => setHospitalSearch(e.target.value)}
@@ -828,28 +856,29 @@ export default function HospitalDashboard() {
                 <span className="combobox-icon">🔍</span>
               </div>
 
-              <div className="combobox-list" style={{ maxHeight: '400px' }}>
+              <div className="combobox-list" style={{ maxHeight: '350px' }}>
                 {hospitalSuggestions.length ? hospitalSuggestions.map((h) => (
                   <button
                     key={h.id}
                     className={`combobox-item ${tempHospitalId === h.id ? 'selected' : ''}`}
+                    style={{ padding: '0.75rem' }}
                     onClick={() => setTempHospitalId(h.id)}
                   >
-                    <div className="combobox-item-text">
-                      {h.name}
-                      <span className="combobox-item-region">{h.region}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{h.name}</span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>{h.region}</span>
                     </div>
-                    <div className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</div>
+                    <div className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px' }}>T{h.tier}</div>
                   </button>
                 )) : (
-                  <div className="combobox-empty">No hospitals found matching "{hospitalSearch}".</div>
+                  <div className="combobox-empty">No hospitals found.</div>
                 )}
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setIsHospitalModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => {
+            <div className="modal-footer" style={{ padding: '1rem' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setIsHospitalModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" style={{ minWidth: '80px' }} onClick={() => {
                 setSelectedHospital(tempHospitalId);
                 const h = allHospitals.find(x => x.id === tempHospitalId);
                 if (h) setHospitalSearch(h.name);
