@@ -6,6 +6,7 @@ import CustomerDashboard from './pages/CustomerDashboard'
 import InsurerDashboard from './pages/InsurerDashboard'
 import HospitalDashboard from './pages/HospitalDashboard'
 import PresentationDashboard from './pages/PresentationDashboard'
+import AlertProvider from './components/AlertProvider'
 
 // ── Theme Context ─────────────────────────────────────────────
 export const ThemeContext = createContext()
@@ -66,17 +67,19 @@ function App() {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <Navbar />
-      <main className="page">
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/get-quote" element={<CustomerNew />} />
-          <Route path="/dashboard" element={<CustomerDashboard />} />
-          <Route path="/insurer" element={<InsurerDashboard />} />
-          <Route path="/hospital" element={<HospitalDashboard />} />
-          <Route path="/presentation" element={<PresentationDashboard />} />
-        </Routes>
-      </main>
+      <AlertProvider>
+        <Navbar />
+        <main className="page">
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/get-quote" element={<CustomerNew />} />
+            <Route path="/dashboard" element={<CustomerDashboard />} />
+            <Route path="/insurer" element={<InsurerDashboard />} />
+            <Route path="/hospital" element={<HospitalDashboard />} />
+            <Route path="/presentation" element={<PresentationDashboard />} />
+          </Routes>
+        </main>
+      </AlertProvider>
     </ThemeContext.Provider>
   )
 }

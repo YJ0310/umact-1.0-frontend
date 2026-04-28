@@ -70,7 +70,7 @@ export default function Landing() {
           { value: '20,000', label: 'Claims Analysed', icon: '📋' },
           { value: 'R² 0.962', label: 'Model Accuracy', icon: '🎯' },
           { value: 'RM 21M', label: 'Potential Savings', icon: '💰' },
-          { value: '35', label: 'Hospitals Tiered', icon: '🏥' },
+          { value: '60', label: 'Hospitals Tiered', icon: '🏥' },
         ].map((s, i) => (
           <div key={i} className="card card-stat animate-in" style={{animationDelay: `${i * 0.1}s`}}>
             <div style={{fontSize: '1.5rem', marginBottom: '0.25rem'}}>{s.icon}</div>

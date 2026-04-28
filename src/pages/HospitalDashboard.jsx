@@ -41,6 +41,13 @@ function zoneToBadge(zone) {
   return 'badge-primary'
 }
 
+function normalizeTier(value) {
+  const numeric = Number(value)
+  if (Number.isFinite(numeric) && numeric > 0) return numeric
+  const match = String(value ?? '').match(/\d/)
+  return match ? Number(match[0]) : 2
+}
+
 /* ══════════════════════════════════════════════════════════════
    CHART COMPONENTS
    ══════════════════════════════════════════════════════════════ */
@@ -72,6 +79,7 @@ export default function HospitalDashboard() {
   const [policyToggle, setPolicyToggle] = useState('current') // 'current' | 'singapore' | 'china' | 'both'
   const [selectedDetailYear, setSelectedDetailYear] = useState('all')
   const [hospitalSearch, setHospitalSearch] = useState('')
+  const [showHospitalSuggestions, setShowHospitalSuggestions] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString())
 
   useEffect(() => {
@@ -80,14 +88,12 @@ export default function HospitalDashboard() {
       .then(result => {
         if (result.success) {
           const { hospitals, hospitalDRG, yearlyPoolDetails: yearlyDetails = [], drgCatalog = [] } = result.data
-          const uniqueDRGs = (drgCatalog.length ? drgCatalog : [...new Set(hospitalDRG.map(d => d._id.drg))])
-            .filter(Boolean)
-            .slice(0, 15)
+          const uniqueDRGs = drgCatalog.length ? drgCatalog : []
           setDrgList(uniqueDRGs)
           setYearlyPoolDetails(yearlyDetails)
 
           const mapped = hospitals.map(h => {
-            const tier = Number(h.tier ?? h.final_tier ?? 2)
+            const tier = normalizeTier(h.tier)
             const drgs = {}
             uniqueDRGs.forEach(drg => {
               const match = hospitalDRG.find(d => d._id.hospital === h.hospital_name && d._id.drg === drg)
@@ -153,6 +159,10 @@ export default function HospitalDashboard() {
     if (!term) return allHospitals
     return allHospitals.filter((h) => h.name.toLowerCase().includes(term))
   }, [allHospitals, hospitalSearch])
+
+  const hospitalSuggestions = useMemo(() => {
+    return filteredHospitals.slice(0, 12)
+  }, [filteredHospitals])
 
   useEffect(() => {
     if (!filteredHospitals.length) return
@@ -410,10 +420,19 @@ export default function HospitalDashboard() {
      RENDER
      ══════════════════════════════════════════════════════════ */
   if (loading) return (
-    <div className="container" style={{ textAlign: 'center', padding: '4rem 0' }}>
-      <div className="spinner" style={{ fontSize: '3rem', marginBottom: '1rem' }}>↻</div>
-      <h2>Loading Hospital Network Data...</h2>
-      <p style={{ color: 'var(--text-secondary)' }}>Fetching live analytics from MongoDB Atlas</p>
+    <div className="container" style={{ padding: '2rem 0' }}>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="skeleton skeleton-title" style={{ marginBottom: '0.75rem' }} />
+        <div className="skeleton skeleton-text" />
+      </div>
+      <div className="grid grid-2" style={{ marginBottom: '1rem' }}>
+        <div className="card"><div className="skeleton skeleton-chart" /></div>
+        <div className="card"><div className="skeleton skeleton-chart" /></div>
+      </div>
+      <div className="card">
+        <div className="skeleton skeleton-text" style={{ width: '45%' }} />
+        <div className="skeleton skeleton-card" style={{ marginTop: '0.75rem' }} />
+      </div>
     </div>
   )
 
@@ -461,8 +480,31 @@ export default function HospitalDashboard() {
                 placeholder="Search hospital (60 total)"
                 value={hospitalSearch}
                 onChange={(e) => setHospitalSearch(e.target.value)}
+                onFocus={() => setShowHospitalSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowHospitalSuggestions(false), 150)}
                 style={{ marginBottom: '0.5rem' }}
               />
+              {showHospitalSuggestions && (
+                <div className="suggestion-list">
+                  {hospitalSuggestions.length ? hospitalSuggestions.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      className="suggestion-item"
+                      onClick={() => {
+                        setSelectedHospital(h.id)
+                        setHospitalSearch(h.name)
+                        setShowHospitalSuggestions(false)
+                      }}
+                    >
+                      <span>{h.name}</span>
+                      <span className="badge badge-primary">Tier {h.tier}</span>
+                    </button>
+                  )) : (
+                    <div className="suggestion-empty">No matching hospitals</div>
+                  )}
+                </div>
+              )}
               <select
                 className="input"
                 value={selectedHospital}

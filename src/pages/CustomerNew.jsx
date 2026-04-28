@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAlert } from '../components/AlertProvider'
 
 /* ══════════════════════════════════════════════════════════════
    DATA / CONSTANTS
@@ -129,6 +130,7 @@ const STEP_KEYS = ['dob', 'gender', 'body', 'smoke', 'health', 'state', 'plan']
    ══════════════════════════════════════════════════════════════ */
 export default function CustomerNew() {
   const navigate = useNavigate()
+  const { showAlert } = useAlert()
   const [step, setStep] = useState(0)
   const [data, setData] = useState({
     dobYear: '', dobMonth: '', dobDay: '',
@@ -212,6 +214,7 @@ export default function CustomerNew() {
           setPricingModel(null)
           setPlanEstimates([])
           setQuoteMessage('Using fallback estimate. Please retry for model-driven explanation.')
+          showAlert('Live quote unavailable. Showing fallback estimate.', 'warning')
         }
       } catch (e) {
         console.error("API error", e)
@@ -219,6 +222,7 @@ export default function CustomerNew() {
         setPricingModel(null)
         setPlanEstimates([])
         setQuoteMessage('Using fallback estimate due to network error.')
+        showAlert('Network error. Showing fallback estimate.', 'error')
       }
       setLoading(false)
       setShowResult(true)
@@ -253,12 +257,13 @@ export default function CustomerNew() {
         const result = await res.json()
         if (result.success) {
             setUploadSuccess(true)
+          showAlert('Checkup uploaded. Pending insurer review.', 'success')
         } else {
-            alert('Upload failed: ' + result.error)
+          showAlert(`Upload failed: ${result.error}`, 'error')
         }
     } catch (error) {
         console.error('Upload Error', error)
-        alert('Upload failed due to network error')
+        showAlert('Upload failed due to network error', 'error')
     }
     setUploading(false)
   }
@@ -276,8 +281,6 @@ export default function CustomerNew() {
   }
 
   const condCount = data.conditions.filter(c => c !== 'none').length
-  const selectedState = STATES.find(s => s.name === data.state)
-
   const handleContinueToDashboard = () => {
     const hasRegisteredAccount = localStorage.getItem('customer_account_ready') === 'true'
     if (hasRegisteredAccount) {
@@ -286,7 +289,7 @@ export default function CustomerNew() {
     }
 
     if (!quoteId) {
-      alert('Please calculate and save a quote first before sign in.')
+      showAlert('Please calculate and save a quote first before sign in.', 'warning')
       return
     }
 
@@ -332,7 +335,7 @@ export default function CustomerNew() {
         <div className="card animate-in" style={{ animationDelay: '0.2s', marginTop: '1rem' }}>
           <h4 style={{ marginBottom: '0.75rem' }}>📊 Why this price?</h4>
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-            Backend model explanation for your personalized premium:
+            Key factors behind your estimate:
           </p>
           {factors.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

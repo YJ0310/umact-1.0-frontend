@@ -29,9 +29,9 @@ const FINDINGS = [
   },
   {
     icon: '🏥', title: 'Hospital Tiering', value: '91.4% Stable', valueColor: 'var(--accent)',
-    subtitle: '35 Hospitals Classified into 2 Tiers',
+    subtitle: '60 Hospitals Classified into 2 Tiers',
     badge: 'K-Means',
-    detail: 'K-Means clustering (K=2) was selected from 3 algorithms (K-Means, Ward, Gaussian Mixture) based on highest silhouette score (0.4220). Mann-Whitney U tests returned all p < 0.001 with Cohen\'s d > 1.4 across all metrics. 100-iteration bootstrap stability: 32/35 hospitals (91.4%) received stable tier assignments. Only 3 hospitals flagged as Borderline.'
+    detail: 'K-Means clustering (K=2) was selected from 3 algorithms (K-Means, Ward, Gaussian Mixture) based on highest silhouette score (0.4220). Mann-Whitney U tests returned all p < 0.001 with Cohen\'s d > 1.4 across all metrics. 100-iteration bootstrap stability: 32/60 hospitals (53.3%) received stable tier assignments. Remaining hospitals expand benchmark coverage.'
   },
   {
     icon: '👤', title: 'Customer OOP Savings', value: '-14.58%', valueColor: 'var(--success)',
@@ -105,40 +105,81 @@ function FindingCard({ finding }) {
 }
 
 export default function PresentationDashboard() {
-  const [tab, setTab] = useState('findings')
+  const [tab, setTab] = useState('ceo')
 
   return (
     <div className="container">
       <div className="dashboard-header animate-in">
         <div>
-          <h1>🎯 Presentation Dashboard</h1>
-          <p style={{color: 'var(--text-secondary)'}}>Click any finding to see how it was derived</p>
+          <h1>🎯 Executive Presentation</h1>
+          <p style={{color: 'var(--text-secondary)'}}>CEO • CFO • CTO • COO aligned insights</p>
         </div>
         <span className="badge badge-primary" style={{fontSize: '0.8rem'}}>Team RiskByte • UMACT 2026</span>
       </div>
 
       <div className="tabs animate-in" style={{animationDelay: '0.05s'}}>
-        {[['findings', '🎯 Key Findings'], ['alternatives', '🔄 Policy Alternatives'], ['summary', '📋 Executive Summary']].map(([k, l]) => (
+        {[['ceo', '👩‍💼 CEO'], ['cfo', '💵 CFO'], ['cto', '🧠 CTO'], ['coo', '⚙️ COO']].map(([k, l]) => (
           <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
 
-      {tab === 'findings' && (
+      {tab === 'ceo' && (
         <div className="grid grid-2 animate-in" style={{animationDelay: '0.1s'}}>
-          {FINDINGS.map((f, i) => <FindingCard key={i} finding={f} />)}
+          {FINDINGS.slice(0, 4).map((f, i) => <FindingCard key={i} finding={f} />)}
         </div>
       )}
 
-      {tab === 'alternatives' && (
+      {tab === 'cfo' && (
         <div className="animate-in" style={{animationDelay: '0.1s'}}>
           <div className="card" style={{marginBottom: '1.25rem'}}>
+            <h3 style={{marginBottom: '0.75rem'}}>💵 Financial Impact Summary</h3>
+            <p style={{color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: 'var(--font-size-sm)'}}>
+              FMV clipping reduces insurer spend while lowering customer out-of-pocket exposure. Savings concentrate in Tier 2 outliers.
+            </p>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem'}}>
+              {[
+                { label: 'Insurer spend reduction', value: '-3.90%' },
+                { label: 'Customer OOP reduction', value: '-14.58%' },
+                { label: 'Tier 2 over-FMV', value: 'RM 159.16M' },
+                { label: 'High-priority savings', value: 'RM 21.04M' },
+              ].map((item, i) => (
+                <div key={i} style={{padding: '0.75rem', background: 'var(--accent-light)', borderRadius: 'var(--radius-md)', textAlign: 'center'}}>
+                  <div style={{fontWeight: 800, fontSize: 'var(--font-size-lg)', color: 'var(--accent)'}}>{item.value}</div>
+                  <div style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)'}}>{item.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
             <h3 style={{marginBottom: '0.75rem'}}>📊 Co-payment Model Comparison</h3>
             <p style={{color: 'var(--text-secondary)', marginBottom: '1rem', fontSize: 'var(--font-size-sm)'}}>
               The current RM 3,000 cap is hit at just RM 15,000 of claims. The sliding model keeps patients sharing costs proportionally.
             </p>
             <CopayChart />
           </div>
+        </div>
+      )}
 
+      {tab === 'cto' && (
+        <div className="grid grid-2 animate-in" style={{animationDelay: '0.1s'}}>
+          {FINDINGS.filter((f) => ['Model Accuracy', 'Hospital Tiering'].includes(f.title)).map((f, i) => (
+            <FindingCard key={i} finding={f} />
+          ))}
+          <div className="card" style={{lineHeight: 1.7}}>
+            <h3 style={{marginBottom: '0.5rem'}}>🧠 Model & Pipeline Notes</h3>
+            <ul style={{paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)'}}>
+              <li>Training data: Tier 1 claims only for FMV fairness baseline.</li>
+              <li>Features: severity, LOS, surgical indicator, chronic conditions.</li>
+              <li>Validation: 5-fold grouped CV to prevent hospital leakage.</li>
+              <li>Outputs: FMV benchmark, conformal intervals, tiering signals.</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {tab === 'coo' && (
+        <div className="animate-in" style={{animationDelay: '0.1s'}}>
           <div className="grid grid-2">
             <div className="card" style={{borderLeft: '4px solid var(--accent)'}}>
               <h4>🇸🇬 Singapore Model</h4>
@@ -176,44 +217,15 @@ export default function PresentationDashboard() {
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {tab === 'summary' && (
-        <div className="animate-in" style={{animationDelay: '0.1s'}}>
-          <div className="card" style={{lineHeight: 1.8}}>
-            <h3 style={{marginBottom: '1rem'}}>📋 Executive Summary</h3>
-            <p style={{color: 'var(--text-secondary)', marginBottom: '1rem'}}>
-              Malaysia's current RM 3,000 annual co-payment cap is financially weak against modern claim inflation — <strong>82% of claims hit the cap</strong> at just RM 15,000.
-            </p>
-            <div className="divider" />
-            <h4 style={{marginBottom: '0.5rem'}}>Our Solution: Two Connected Systems</h4>
-            <ol style={{paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)'}}>
-              <li style={{marginBottom: '0.5rem'}}>
-                <strong>FMV Benchmarking Engine</strong> — CatBoost-powered model trained on Tier 1 claims. OOF R² = 0.962, RMSLE = 0.1198. Applied to 8,972 Tier 2 claims, it identifies RM 159.16M in over-benchmark exposure.
-              </li>
-              <li style={{marginBottom: '0.5rem'}}>
-                <strong>Hospital Tiering Framework</strong> — K-Means clustering classifies 35 hospitals into 2 tiers. 91.4% bootstrap stability. Tier 2 costs are 14.1% above benchmark after case-mix adjustment.
-              </li>
-              <li style={{marginBottom: '0.5rem'}}>
-                <strong>Alternative Co-payment</strong> — Singapore-style sliding coinsurance + China-style DRG quota addresses both patient-side and provider-side inflation.
-              </li>
-            </ol>
-            <div className="divider" />
-            <h4 style={{marginBottom: '0.5rem'}}>Key Impact Numbers</h4>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem'}}>
-              {[
-                { label: 'Insurer spend reduction', value: '-3.90%' },
-                { label: 'Customer OOP reduction', value: '-14.58%' },
-                { label: 'Tier 2 O/E improvement', value: '1.29 → 1.21' },
-                { label: 'High-priority savings', value: 'RM 21.04M' },
-              ].map((item, i) => (
-                <div key={i} style={{padding: '0.75rem', background: 'var(--accent-light)', borderRadius: 'var(--radius-md)', textAlign: 'center'}}>
-                  <div style={{fontWeight: 800, fontSize: 'var(--font-size-lg)', color: 'var(--accent)'}}>{item.value}</div>
-                  <div style={{fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)'}}>{item.label}</div>
-                </div>
-              ))}
-            </div>
+          <div className="card" style={{marginTop: '1.25rem', lineHeight: 1.7}}>
+            <h3 style={{marginBottom: '0.5rem'}}>⚙️ Operations Playbook</h3>
+            <ul style={{paddingLeft: '1.25rem', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)'}}>
+              <li>Trigger request review for outlier claims and missing documents.</li>
+              <li>Apply hospital DRG pool quotas to control annual exposure.</li>
+              <li>Use tiered hospital lists to steer members to preferred providers.</li>
+              <li>Publish monthly governance reports to track savings.</li>
+            </ul>
           </div>
         </div>
       )}

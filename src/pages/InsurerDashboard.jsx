@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Chart, registerables } from 'chart.js'
+import { useAlert } from '../components/AlertProvider'
 Chart.register(...registerables)
 
-/* ══════════════════════════════════════════════════════════════
-   DATA — aligned with Final Report analysis
-   ══════════════════════════════════════════════════════════════ */
 const INSURER_DATA = {
   tierComparison: {
     labels: ['Avg Claim (RM)', 'Avg LOS (days)', 'O/E Ratio', 'Surgical Share (%)'],
@@ -42,38 +40,140 @@ function ChartBox({ config, height = 300 }) {
 }
 
 export default function InsurerDashboard() {
-  const [tab, setTab] = useState('overview')
+  const { showAlert } = useAlert()
+  const [tab, setTab] = useState('request-board')
   const [stats, setStats] = useState(null)
-  const [pendingQuotes, setPendingQuotes] = useState([])
-  const [pendingClaims, setPendingClaims] = useState([])
-  const [approvingId, setApprovingId] = useState(null)
+  const [requests, setRequests] = useState([])
+  const [users, setUsers] = useState([])
+  const [loadingRequests, setLoadingRequests] = useState(false)
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [decisionNotes, setDecisionNotes] = useState({})
+  const [decisionAmounts, setDecisionAmounts] = useState({})
+  const [savingRequest, setSavingRequest] = useState(null)
+  const [editingUserId, setEditingUserId] = useState(null)
+  const [userEdit, setUserEdit] = useState({ planType: '', annualLimit: '' })
 
-  useEffect(() => {
-    fetch('/api/analytics/insurer')
-      .then(res => res.json())
-      .then(result => { if (result.success) setStats(result.data) })
-    fetchPending()
-  }, [])
+  const getId = (item) => item?._id?.$oid || item?._id || ''
 
-  const fetchPending = () => {
-    fetch('/api/analytics/insurer/pending')
-      .then(res => res.json())
-      .then(result => { if (result.success) setPendingQuotes(result.data) })
-    fetch('/api/analytics/insurer/claims/pending')
-      .then(res => res.json())
-      .then(result => { if (result.success) setPendingClaims(result.data) })
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/analytics/insurer')
+      const result = await res.json()
+      if (result.success) setStats(result.data)
+    } catch (err) {
+      showAlert('Failed to load insurer stats.', 'error')
+    }
   }
 
-  const handleApprove = async (id) => {
-    setApprovingId(id)
+  const fetchRequests = async () => {
+    setLoadingRequests(true)
     try {
-      const res = await fetch(`/api/analytics/insurer/approve/${id}`, { method: 'POST' })
-      const data = await res.json()
-      if (data.success) fetchPending()
-    } catch (e) {
-      console.error(e)
+      const res = await fetch('/api/analytics/insurer/requests')
+      const result = await res.json()
+      if (result.success) setRequests(result.data || [])
+    } catch (err) {
+      showAlert('Failed to load request board.', 'error')
+    } finally {
+      setLoadingRequests(false)
     }
-    setApprovingId(null)
+  }
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true)
+    try {
+      const res = await fetch('/api/analytics/insurer/users')
+      const result = await res.json()
+      if (result.success) setUsers(result.data || [])
+    } catch (err) {
+      showAlert('Failed to load users.', 'error')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchStats()
+    fetchRequests()
+    fetchUsers()
+  }, [])
+
+  const submitDecision = async (request, status) => {
+    const requestId = getId(request)
+    setSavingRequest(requestId)
+    const note = decisionNotes[requestId] || ''
+    const amount = decisionAmounts[requestId]
+    const reviewData = request.type === 'claim'
+      ? {
+          actualAmountFinal: status === 'approved' ? Number(amount || request.payload?.claimAmount || 0) : null,
+          note: note || null
+        }
+      : { note: note || null }
+
+    try {
+      const res = await fetch(`/api/analytics/insurer/requests/${requestId}/decision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason: note || null, reviewData })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showAlert(`Request ${status}.`, 'success')
+        fetchRequests()
+      } else {
+        showAlert(data.error || 'Failed to update request.', 'error')
+      }
+    } catch (err) {
+      showAlert('Network error while updating request.', 'error')
+    } finally {
+      setSavingRequest(null)
+    }
+  }
+
+  const startEditUser = (user) => {
+    setEditingUserId(getId(user))
+    setUserEdit({
+      planType: user?.planType || '',
+      annualLimit: user?.annualLimit || ''
+    })
+  }
+
+  const saveUser = async () => {
+    if (!editingUserId) return
+    try {
+      const res = await fetch(`/api/analytics/insurer/users/${editingUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planType: userEdit.planType,
+          annualLimit: userEdit.annualLimit
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showAlert('User updated.', 'success')
+        setEditingUserId(null)
+        fetchUsers()
+      } else {
+        showAlert(data.error || 'Failed to update user.', 'error')
+      }
+    } catch (err) {
+      showAlert('Network error while updating user.', 'error')
+    }
+  }
+
+  const deleteUser = async (userId) => {
+    try {
+      const res = await fetch(`/api/analytics/insurer/users/${userId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        showAlert('User removed.', 'success')
+        fetchUsers()
+      } else {
+        showAlert(data.error || 'Failed to remove user.', 'error')
+      }
+    } catch (err) {
+      showAlert('Network error while removing user.', 'error')
+    }
   }
 
   const tierBarConfig = {
@@ -143,22 +243,57 @@ export default function InsurerDashboard() {
     }
   }
 
+  // Show loading skeleton while stats, requests, and users are loading
+  if (!stats || loadingRequests || loadingUsers) {
+    return (
+      <div className="container">
+        <div className="dashboard-header animate-in">
+          <div>
+            <div className="skeleton skeleton-text" style={{maxWidth: '300px', marginBottom: '0.5rem'}} />
+            <div className="skeleton skeleton-text" style={{maxWidth: '400px'}} />
+          </div>
+        </div>
+
+        <div className="stats-row animate-in" style={{animationDelay: '0.1s'}}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="card card-stat">
+              <div className="skeleton skeleton-circle" style={{width: '24px', height: '24px', marginBottom: '0.5rem'}} />
+              <div className="skeleton skeleton-text" style={{maxWidth: '80px', marginBottom: '0.5rem'}} />
+              <div className="skeleton skeleton-text" style={{maxWidth: '100px'}} />
+            </div>
+          ))}
+        </div>
+
+        <div className="tabs animate-in" style={{animationDelay: '0.15s'}}>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="skeleton skeleton-text" style={{maxWidth: '120px', marginRight: '1rem', height: '36px'}} />
+          ))}
+        </div>
+
+        <div className="card animate-in" style={{animationDelay: '0.2s'}}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="skeleton skeleton-text" style={{marginBottom: '0.75rem'}} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="container">
       <div className="dashboard-header animate-in">
         <div>
-          <h1>🏢 Insurer Analytics</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Profit comparison & cost governance dashboard</p>
+          <h1>🏢 Insurer Command Center</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Request governance, member edits, and profit analytics</p>
         </div>
       </div>
 
-      {/* Key Stats */}
       <div className="stats-row animate-in" style={{ animationDelay: '0.1s' }}>
         {[
           { label: 'Total Claims Analysed', value: stats ? stats.totalClaims.toLocaleString() : '...', icon: '📋' },
           { label: 'Total Claim Amount', value: stats ? `RM ${(stats.totalClaimAmount / 1e6).toFixed(1)}M` : '...', icon: '💰' },
           { label: 'Avg Patient Co-Pay', value: stats ? `RM ${Math.round(stats.copayment?.avgCopay || 0).toLocaleString()}` : '...', icon: '📊' },
-          { label: 'Pending Approvals', value: `${pendingQuotes.length} docs`, icon: '🎯' },
+          { label: 'Live Requests', value: `${requests.length} items`, icon: '🎯' },
         ].map((s, i) => (
           <div key={i} className="card card-stat">
             <div style={{ fontSize: '1.25rem' }}>{s.icon}</div>
@@ -169,136 +304,155 @@ export default function InsurerDashboard() {
       </div>
 
       <div className="tabs animate-in" style={{ animationDelay: '0.15s' }}>
-        {[['overview', '📊 Overview'], ['comparison', '⚖️ Before vs After'], ['hospitals', '🏥 Hospital FMV'], ['insurer-tools', '🔧 Insurer Actions']].map(([k, l]) => (
+        {[
+          ['request-board', '🧾 Request Board'],
+          ['edit-users', '🛠️ Edit Users'],
+          ['profit', '📈 Profit'],
+          ['profit-details', '📊 Profit Details']
+        ].map(([k, l]) => (
           <button key={k} className={`tab ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
 
-      {tab === 'overview' && (
+      {tab === 'request-board' && (
+        <div className="card animate-in">
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+            <h3>Unified Request Board</h3>
+            <button className="btn btn-ghost btn-sm" onClick={fetchRequests} disabled={loadingRequests}>Refresh</button>
+          </div>
+          <div className="table-wrapper">
+            {loadingRequests ? (
+              <div className="skeleton skeleton-chart" />
+            ) : (
+              <table>
+                <thead>
+                  <tr><th>Customer</th><th>Type</th><th>Hospital/DRG</th><th>Amount</th><th>Status</th><th>Decision</th></tr>
+                </thead>
+                <tbody>
+                  {requests.length === 0 ? (
+                    <tr><td colSpan="6" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>No requests.</td></tr>
+                  ) : requests.map((r) => {
+                    const requestId = getId(r)
+                    const decisionNote = decisionNotes[requestId] || ''
+                    const decisionAmount = decisionAmounts[requestId] || ''
+                    return (
+                      <tr key={requestId}>
+                        <td>{r.customerName || r.firebaseUid || 'Unknown'}</td>
+                        <td>{r.type}</td>
+                        <td>{r.payload?.hospitalName || '-'} / {r.payload?.drg || '-'}</td>
+                        <td>RM {Number(r.payload?.claimAmount || 0).toLocaleString()}</td>
+                        <td><span className={`badge ${r.status === 'approved' ? 'badge-success' : r.status === 'denied' ? 'badge-danger' : r.status === 'reviewed' ? 'badge-primary' : 'badge-warning'}`}>{r.status}</span></td>
+                        <td>
+                          <div style={{display: 'grid', gap: '0.5rem'}}>
+                            <input
+                              className="input"
+                              placeholder="Decision note (optional)"
+                              value={decisionNote}
+                              onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [requestId]: e.target.value }))}
+                            />
+                            {r.type === 'claim' && (
+                              <input
+                                className="input"
+                                type="number"
+                                placeholder="Approved amount"
+                                value={decisionAmount}
+                                onChange={(e) => setDecisionAmounts((prev) => ({ ...prev, [requestId]: e.target.value }))}
+                              />
+                            )}
+                            <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                              <button className="btn btn-primary btn-sm" onClick={() => submitDecision(r, 'approved')} disabled={savingRequest === requestId}>Approve</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => submitDecision(r, 'reviewed')} disabled={savingRequest === requestId}>Need Docs</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => submitDecision(r, 'denied')} disabled={savingRequest === requestId}>Deny</button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'edit-users' && (
+        <div className="card animate-in">
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+            <h3>Edit & Remove Users</h3>
+            <button className="btn btn-ghost btn-sm" onClick={fetchUsers} disabled={loadingUsers}>Refresh</button>
+          </div>
+          <div className="table-wrapper">
+            {loadingUsers ? (
+              <div className="skeleton skeleton-chart" />
+            ) : (
+              <table>
+                <thead><tr><th>Name</th><th>Email</th><th>Plan</th><th>Annual Limit</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {users.length === 0 ? (
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>No users.</td></tr>
+                  ) : users.map((u) => {
+                    const userId = getId(u)
+                    const isEditing = editingUserId === userId
+                    return (
+                      <tr key={userId}>
+                        <td>{u.name || 'Unknown'}</td>
+                        <td>{u.email || '—'}</td>
+                        <td>
+                          {isEditing ? (
+                            <select className="input" value={userEdit.planType} onChange={(e) => setUserEdit((prev) => ({ ...prev, planType: e.target.value }))}>
+                              {['Basic', 'Silver', 'Gold', 'Platinum'].map((p) => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="badge badge-primary">{u.planType || 'Basic'}</span>
+                          )}
+                        </td>
+                        <td>
+                          {isEditing ? (
+                            <input className="input" type="number" value={userEdit.annualLimit} onChange={(e) => setUserEdit((prev) => ({ ...prev, annualLimit: e.target.value }))} />
+                          ) : (
+                            `RM ${Number(u.annualLimit || 0).toLocaleString()}`
+                          )}
+                        </td>
+                        <td style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                          {isEditing ? (
+                            <>
+                              <button className="btn btn-primary btn-sm" onClick={saveUser}>Save</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setEditingUserId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className="btn btn-ghost btn-sm" onClick={() => startEditUser(u)}>Edit</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => deleteUser(userId)}>Remove</button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'profit' && (
         <div className="animate-in">
           <div className="chart-grid">
             <div className="card"><ChartBox config={tierBarConfig} /></div>
-            <div className="card"><ChartBox config={trendsConfig} /></div>
-          </div>
-
-          <div className="card" style={{ marginTop: '1.25rem' }}>
-            <h3 style={{ marginBottom: '1rem' }}>O/E Ratio — Before vs After MHIT</h3>
-            <div className="table-wrapper">
-              <table>
-                <thead><tr><th>Tier</th><th>Observed (RM)</th><th>Expected (RM)</th><th>O/E Before</th><th>O/E After</th><th>Savings (RM)</th></tr></thead>
-                <tbody>
-                  <tr>
-                    <td><span className="badge badge-success">Preferred</span></td>
-                    <td>338,761,174</td><td>280,560,385</td><td>1.2074</td><td>1.2074</td><td>—</td>
-                  </tr>
-                  <tr>
-                    <td><span className="badge badge-danger">Standard</span></td>
-                    <td>703,312,612</td><td>544,148,256</td><td>1.2925</td><td>1.2096</td>
-                    <td style={{ fontWeight: 700, color: 'var(--success)' }}>RM 45,108,855</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <div className="card"><ChartBox config={mhitConfig} /></div>
           </div>
         </div>
       )}
 
-      {tab === 'comparison' && (
+      {tab === 'profit-details' && (
         <div className="animate-in">
           <div className="chart-grid">
-            <div className="card"><ChartBox config={mhitConfig} /></div>
-            <div className="card">
-              <div className="chart-title">💡 What does FMV Clipping do?</div>
-              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
-                <p>FMV (Fair Market Value) clipping caps hospital charges at the <strong>predicted benchmark</strong> — if a hospital charges more than the expected fair cost for a procedure, the excess is not reimbursed at full rate.</p>
-                <div className="divider" />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--success-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 800, fontSize: 'var(--font-size-lg)', color: 'var(--success)' }}>-3.90%</div>
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Insurer Spend</div>
-                  </div>
-                  <div style={{ padding: '0.75rem', background: 'var(--success-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 800, fontSize: 'var(--font-size-lg)', color: 'var(--success)' }}>-14.58%</div>
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>Customer OOP</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === 'hospitals' && (
-        <div className="animate-in">
-          <div className="card" style={{ marginBottom: '1.25rem' }}>
-            <ChartBox config={fmvGapConfig} />
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
-              🟢 Green = Preferred hospitals &nbsp;|&nbsp; 🔴 Red = Standard hospitals
-            </p>
-          </div>
-        </div>
-      )}
-
-      {tab === 'insurer-tools' && (
-        <div className="animate-in">
-          <div className="grid grid-2">
-            {/* Approve / Register */}
-            <div className="card">
-              <h4 style={{ marginBottom: '0.75rem' }}>✅ Approve & Register</h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '1rem' }}>
-                Review new customer applications, approve verified plans, and register policyholders.
-              </p>
-              <div className="table-wrapper" style={{ marginBottom: '1rem' }}>
-                <table>
-                  <thead><tr><th>Customer</th><th>Plan</th><th>Status</th><th>Action</th></tr></thead>
-                  <tbody>
-                    {pendingQuotes.length === 0 ? (
-                      <tr><td colSpan="4" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>No pending applications.</td></tr>
-                    ) : pendingQuotes.map((c) => (
-                      <tr key={c._id}>
-                        <td>{c.firebaseUid || 'Anon User'}</td>
-                        <td><span className="badge badge-primary">{c.planType}</span></td>
-                        <td><span className={`badge ${c.checkup_files ? 'badge-warning' : 'badge-danger'}`}>{c.checkup_files ? 'Has Checkup' : 'Missing Checkup'}</span></td>
-                        <td>
-                          <button 
-                            className="btn btn-sm btn-primary" 
-                            disabled={approvingId === c._id}
-                            onClick={() => handleApprove(c._id)}
-                          >
-                            {approvingId === c._id ? '...' : 'Approve'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Claims Review */}
-            <div className="card">
-              <h4 style={{ marginBottom: '0.75rem' }}>📄 Pending Claims</h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: '1rem' }}>
-                Review and approve newly submitted claims from the Customer Portal.
-              </p>
-              <div className="table-wrapper">
-                <table>
-                  <thead><tr><th>Hospital</th><th>User</th><th>Amount</th><th>Action</th></tr></thead>
-                  <tbody>
-                    {pendingClaims.length === 0 ? (
-                      <tr><td colSpan="4" style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)' }}>No pending claims.</td></tr>
-                    ) : pendingClaims.map((c, i) => (
-                      <tr key={i}>
-                        <td>{c.hospitalName}</td>
-                        <td title={c.firebaseUid}>{c.firebaseUid.substring(0,8)}...</td>
-                        <td>RM {c.claimAmount.toLocaleString()}</td>
-                        <td><button className="btn btn-sm btn-outline">Review</button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <div className="card"><ChartBox config={trendsConfig} /></div>
+            <div className="card"><ChartBox config={fmvGapConfig} /></div>
           </div>
         </div>
       )}

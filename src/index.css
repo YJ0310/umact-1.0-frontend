@@ -694,6 +694,29 @@ select.input {
 .skeleton-card { height: 120px; }
 .skeleton-chart { height: 200px; }
 
+/* ── Global Alert ─────────────────────────────────────────── */
+.global-alert {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  max-width: 360px;
+}
+
+.global-alert-success { border-color: var(--success); }
+.global-alert-error { border-color: var(--danger); }
+.global-alert-warning { border-color: var(--warning); }
+.global-alert-info { border-color: var(--accent); }
+
 /* ── Price Display ──────────────────────────────────────────── */
 .price-display {
   text-align: center;
@@ -751,6 +774,42 @@ select.input {
 .progress-fill.green { background: var(--success); }
 .progress-fill.yellow { background: var(--warning); }
 .progress-fill.red { background: var(--danger); }
+
+/* ── Search Suggestions ───────────────────────────────────── */
+.suggestion-list {
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  max-height: 260px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-family);
+  color: var(--text-primary);
+  transition: background var(--transition-fast);
+}
+
+.suggestion-item:hover {
+  background: var(--bg-hover);
+}
+
+.suggestion-empty {
+  padding: 0.75rem;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
 
 /* ── Finding Card (Presentation) ────────────────────────────── */
 .finding-card {
