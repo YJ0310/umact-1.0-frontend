@@ -101,6 +101,7 @@ export default function HospitalDashboard() {
   const [drgList, setDrgList] = useState([])
   const [yearlyPoolDetails, setYearlyPoolDetails] = useState([])
   const [loading, setLoading] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
 
   const [viewMode, setViewMode] = useState('byHospital') // 'byHospital' | 'byDRG' | 'tiers'
   const [drgGroupMode, setDrgGroupMode] = useState('detailed') // 'detailed' | 'category'
@@ -113,6 +114,13 @@ export default function HospitalDashboard() {
   const [isHospitalModalOpen, setIsHospitalModalOpen] = useState(false)
   const [tempHospitalId, setTempHospitalId] = useState('')
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString())
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     fetch('/api/analytics/hospitals')
@@ -511,7 +519,7 @@ export default function HospitalDashboard() {
         <div className="skeleton skeleton-title" style={{ marginBottom: '0.75rem' }} />
         <div className="skeleton skeleton-text" />
       </div>
-      <div className="grid grid-2" style={{ marginBottom: '1rem' }}>
+      <div className="grid grid-2" style={{ marginBottom: '1rem', gridTemplateColumns: isMobile ? '1fr' : undefined }}>
         <div className="card"><div className="skeleton skeleton-chart" /></div>
         <div className="card"><div className="skeleton skeleton-chart" /></div>
       </div>
@@ -612,7 +620,7 @@ export default function HospitalDashboard() {
           </div>
 
           {/* Policy Comparison Chart */}
-          <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="card" style={{ marginBottom: '1rem', overflowX: isMobile ? 'auto' : 'visible' }}>
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
               {['current', 'singapore', 'china'].map(p => (
                 <button 
@@ -625,26 +633,26 @@ export default function HospitalDashboard() {
                 </button>
               ))}
             </div>
-            <ChartComponent config={hospitalPolicyCompareConfig} height={460} />
+            <ChartComponent config={hospitalPolicyCompareConfig} height={isMobile ? 340 : 460} />
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
               Green = Standard | Blue = SG | Red = CN
             </p>
           </div>
 
           {/* Money Pool Tracking Charts */}
-          <div className="grid grid-2" style={{ marginBottom: '1rem', gap: '1rem' }}>
+          <div className="grid grid-2" style={{ marginBottom: '1rem', gap: '1rem', gridTemplateColumns: isMobile ? '1fr' : undefined }}>
             <div className="card">
-              <ChartComponent config={hospitalPoolConfig} height={360} />
+              <ChartComponent config={hospitalPoolConfig} height={isMobile ? 280 : 360} />
             </div>
             <div className="card">
-              <ChartComponent config={hospitalPenaltyConfig} height={360} />
+              <ChartComponent config={hospitalPenaltyConfig} height={isMobile ? 280 : 360} />
             </div>
           </div>
 
           {/* DRG Table */}
           <div className="card">
             <h4 style={{ marginBottom: '0.75rem' }}>📋 All DRGs — {hospital.name}</h4>
-            <div className="table-wrapper">
+            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr><th>DRG Category</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Usage %</th><th>Status</th></tr>
@@ -705,7 +713,7 @@ export default function HospitalDashboard() {
                 </select>
               </div>
             </div>
-            <div className="table-wrapper">
+            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr><th>Year</th><th>DRG</th><th>Pool (RM)</th><th>Claim Amount (RM)</th><th>Penalty (RM)</th><th>Status</th></tr>
@@ -732,7 +740,7 @@ export default function HospitalDashboard() {
       {viewMode === 'byDRG' && drgChartConfig && (
         <div className="animate-in">
           <div className="card" style={{ marginBottom: '1rem' }}>
-            <ChartComponent config={drgChartConfig} height={700} />
+            <ChartComponent config={drgChartConfig} height={isMobile ? 480 : 700} />
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
               Top 20 hospitals are shown for readability. Current = green, Singapore = blue, China = red.
             </p>
@@ -741,7 +749,7 @@ export default function HospitalDashboard() {
           {/* DRG Summary Table */}
           <div className="card">
             <h4 style={{ marginBottom: '0.75rem' }}>📋 All Hospitals — {shortenDRG(selectedDRG)}</h4>
-            <div className="table-wrapper">
+            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr><th>Hospital</th><th>Tier</th><th>Region</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Status</th></tr>
@@ -774,7 +782,7 @@ export default function HospitalDashboard() {
       {viewMode === 'tiers' && tierSummary && (
         <div className="animate-in">
           {/* Tier Overview Cards */}
-          <div className="grid grid-2" style={{ marginBottom: '1.25rem' }}>
+          <div className="grid grid-2" style={{ marginBottom: '1.25rem', gridTemplateColumns: isMobile ? '1fr' : undefined }}>
             {[['tier1', tierSummary.tier1, 'var(--success)', '⭐'], ['tier2', tierSummary.tier2, 'var(--danger)', '⚠️']].map(([key, tier, color, icon]) => (
               <div key={key} className="card" style={{ borderLeft: `4px solid ${color}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -800,14 +808,14 @@ export default function HospitalDashboard() {
           {/* Tier Comparison Chart */}
           {tierChartConfig && (
             <div className="card" style={{ marginBottom: '1.25rem' }}>
-              <ChartComponent config={tierChartConfig} height={450} />
+              <ChartComponent config={tierChartConfig} height={isMobile ? 320 : 450} />
             </div>
           )}
 
           {/* Hospital List by Tier */}
           <div className="card">
             <h4 style={{ marginBottom: '0.75rem' }}>📋 All Hospitals by Tier</h4>
-            <div className="table-wrapper">
+            <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr><th>Hospital</th><th>Tier</th><th>Region</th><th>Avg All-DRG Claim (RM)</th><th>Avg O/E</th></tr>
