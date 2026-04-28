@@ -404,6 +404,129 @@ select.input {
   padding-right: 2.5rem;
 }
 
+/* ── Combobox (Shadcn-like) ─────────────────────────────────── */
+.combobox-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.combobox-input {
+  width: 100%;
+  padding-right: 2.5rem;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  transition: border-color 0.2s;
+}
+
+.combobox-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.combobox-icon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.combobox-content {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.combobox-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+/* Custom scrollbar for combobox list */
+.combobox-list::-webkit-scrollbar {
+  width: 6px;
+}
+.combobox-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.combobox-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+.combobox-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.combobox-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.combobox-item:hover, .combobox-item:focus-visible {
+  background: var(--bg-secondary);
+  outline: none;
+}
+
+.combobox-item.selected {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.combobox-item-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.combobox-item-region {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.combobox-item.selected .combobox-item-region {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+.combobox-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
 /* ── Navbar ─────────────────────────────────────────────────── */
 .navbar {
   position: fixed;

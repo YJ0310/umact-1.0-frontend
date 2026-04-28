@@ -551,50 +551,55 @@ export default function HospitalDashboard() {
         {/* Selectors (show only relevant one) */}
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
           {viewMode === 'byHospital' && (
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, position: 'relative' }}>
               <div className="input-label" style={{ marginBottom: '0.25rem' }}>Select Hospital</div>
-              <input
-                className="input"
-                placeholder="Search hospital (60 total)"
-                value={hospitalSearch}
-                onChange={(e) => setHospitalSearch(e.target.value)}
-                onFocus={() => setShowHospitalSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowHospitalSuggestions(false), 150)}
-                style={{ marginBottom: '0.5rem' }}
-              />
+              <div className="combobox-wrapper">
+                <input
+                  className="input combobox-input"
+                  placeholder="Search 60+ hospitals..."
+                  value={hospitalSearch}
+                  onChange={(e) => {
+                    setHospitalSearch(e.target.value)
+                    setShowHospitalSuggestions(true)
+                  }}
+                  onFocus={() => {
+                    if (hospitalSearch === hospital?.name) setHospitalSearch('')
+                    setShowHospitalSuggestions(true)
+                  }}
+                  onBlur={() => setTimeout(() => setShowHospitalSuggestions(false), 200)}
+                />
+                <span className="combobox-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </span>
+              </div>
+              
               {showHospitalSuggestions && (
-                <div className="suggestion-list">
-                  {hospitalSuggestions.length ? hospitalSuggestions.map((h) => (
-                    <button
-                      key={h.id}
-                      type="button"
-                      className="suggestion-item"
-                      onClick={() => {
-                        setSelectedHospital(h.id)
-                        setHospitalSearch(h.name)
-                        setShowHospitalSuggestions(false)
-                      }}
-                    >
-                      <span>{h.name}</span>
-                      <span className="badge badge-primary">Tier {h.tier}</span>
-                    </button>
-                  )) : (
-                    <div className="suggestion-empty">No matching hospitals</div>
+                <div className="combobox-content">
+                  {hospitalSuggestions.length ? (
+                    <div className="combobox-list">
+                      {hospitalSuggestions.map((h) => (
+                        <button
+                          key={h.id}
+                          className={`combobox-item ${selectedHospital === h.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedHospital(h.id)
+                            setHospitalSearch(h.name)
+                            setShowHospitalSuggestions(false)
+                          }}
+                        >
+                          <div className="combobox-item-text">
+                            {h.name}
+                            <span className="combobox-item-region">{h.region}</span>
+                          </div>
+                          <div className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="combobox-empty">No items found.</div>
                   )}
                 </div>
               )}
-              <select
-                className="input"
-                value={selectedHospital}
-                onChange={e => setSelectedHospital(e.target.value)}
-                style={{ width: '100%' }}
-              >
-                {filteredHospitals.length ? filteredHospitals.map(h => (
-                  <option key={h.id} value={h.id}>{h.name} (Tier {h.tier}) — {h.region}</option>
-                )) : (
-                  <option value="">No matching hospitals</option>
-                )}
-              </select>
             </div>
           )}
           {viewMode === 'byDRG' && (
