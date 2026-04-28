@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Chart, registerables } from 'chart.js'
 Chart.register(...registerables)
 
-const CHART_COLORS = ['#4c6ef5','#7c3aed','#2ecc71','#f0a530','#e74c3c','#3498db','#e67e22','#1abc9c','#9b59b6','#34495e','#d35400','#27ae60','#c0392b','#2980b9','#8e44ad']
+const POLICY_COLORS = {
+  current: 'rgba(46, 204, 113, 0.75)', // green
+  singapore: 'rgba(52, 152, 219, 0.75)', // blue
+  china: 'rgba(231, 76, 60, 0.75)' // red
+}
 
 /* ── Policy Calculations ─────────────────────────────────── */
 function currentCopay(claim) { return Math.min(claim * 0.20, 3000) }
@@ -29,23 +33,12 @@ function sgPvtCopay(claim) {
   return paid
 }
 
-function chinaBlendedRate(claimCount, quota, enforceQuota = true) {
-  if (!enforceQuota || claimCount === 0 || quota <= 0) return 1.0
-  const buffer = quota * 1.2
-  const penalty = quota * 1.5
-
-  if (claimCount <= buffer) {
-    return 1.0
-  } else if (claimCount <= penalty) {
-    const full = buffer
-    const reduced = claimCount - buffer
-    return ((full * 1.0) + (reduced * 0.8)) / claimCount
-  } else {
-    const full = buffer
-    const reduced = penalty - buffer
-    const severe = claimCount - penalty
-    return ((full * 1.0) + (reduced * 0.8) + (severe * 0.6)) / claimCount
-  }
+function zoneToBadge(zone) {
+  if (zone === 'Normal') return 'badge-success'
+  if (zone === 'Buffer') return 'badge-warning'
+  if (zone === 'Reduced') return 'badge-warning'
+  if (zone === 'Penalty') return 'badge-danger'
+  return 'badge-primary'
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -70,12 +63,14 @@ function ChartComponent({ config, height = 300 }) {
 export default function HospitalDashboard() {
   const [allHospitals, setAllHospitals] = useState([])
   const [drgList, setDrgList] = useState([])
+  const [yearlyPoolDetails, setYearlyPoolDetails] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [viewMode, setViewMode] = useState('byHospital') // 'byHospital' | 'byDRG' | 'tiers'
   const [selectedHospital, setSelectedHospital] = useState('')
   const [selectedDRG, setSelectedDRG] = useState('')
   const [policyToggle, setPolicyToggle] = useState('current') // 'current' | 'singapore' | 'china' | 'both'
+  const [selectedDetailYear, setSelectedDetailYear] = useState('all')
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString())
 
   useEffect(() => {
@@ -83,9 +78,12 @@ export default function HospitalDashboard() {
       .then(res => res.json())
       .then(result => {
         if (result.success) {
-          const { hospitals, hospitalDRG } = result.data
-          const uniqueDRGs = [...new Set(hospitalDRG.map(d => d._id.drg))].filter(Boolean).sort()
+          const { hospitals, hospitalDRG, yearlyPoolDetails: yearlyDetails = [], drgCatalog = [] } = result.data
+          const uniqueDRGs = (drgCatalog.length ? drgCatalog : [...new Set(hospitalDRG.map(d => d._id.drg))])
+            .filter(Boolean)
+            .slice(0, 15)
           setDrgList(uniqueDRGs)
+          setYearlyPoolDetails(yearlyDetails)
 
           const mapped = hospitals.map(h => {
             const tier = Number(h.tier ?? h.final_tier ?? 2)
@@ -96,11 +94,40 @@ export default function HospitalDashboard() {
                 const avgClaim = Math.round(match.avgClaim)
                 const claimCount = match.count
                 const enforceQuota = Boolean(match.enforceQuota)
-                const quota = enforceQuota ? Math.max(1, Math.round(match.quota || 1)) : 0
+                const poolAmount = enforceQuota ? Math.max(1, Math.round(match.poolAmount || 1)) : 0
+                const claimRequestAmount = Math.round(match.claimRequestAmount || 0)
+                const reimbursedAmount = Math.round(match.reimbursedAmount || claimRequestAmount)
+                const penaltyAmount = Math.round(match.penaltyAmount || Math.max(0, claimRequestAmount - reimbursedAmount))
+                const usagePct = typeof match.usagePct === 'number'
+                  ? match.usagePct
+                  : (poolAmount > 0 ? (claimRequestAmount / poolAmount) * 100 : null)
+                const statusZone = match.statusZone || 'Observe'
                 const oe = (avgClaim / (tier === 1 ? 18000 : 25000)).toFixed(3)
-                drgs[drg] = { avgClaim, claimCount, quota, enforceQuota, oe: parseFloat(oe) }
+                drgs[drg] = {
+                  avgClaim,
+                  claimCount,
+                  poolAmount,
+                  claimRequestAmount,
+                  reimbursedAmount,
+                  penaltyAmount,
+                  usagePct,
+                  statusZone,
+                  enforceQuota,
+                  oe: parseFloat(oe)
+                }
               } else {
-                drgs[drg] = { avgClaim: 0, claimCount: 0, quota: 0, enforceQuota: false, oe: 1 }
+                drgs[drg] = {
+                  avgClaim: 0,
+                  claimCount: 0,
+                  poolAmount: 0,
+                  claimRequestAmount: 0,
+                  reimbursedAmount: 0,
+                  penaltyAmount: 0,
+                  usagePct: null,
+                  statusZone: 'Observe',
+                  enforceQuota: false,
+                  oe: 1
+                }
               }
             })
             // Map _id to id if needed, logic is expecting `id` string
@@ -120,6 +147,20 @@ export default function HospitalDashboard() {
   }, [])
 
   const hospital = allHospitals.find(h => h.id === selectedHospital)
+  const yearlyOptions = useMemo(() => {
+    return [...new Set(yearlyPoolDetails.map(r => r.policyYear))].sort((a, b) => a - b)
+  }, [yearlyPoolDetails])
+
+  const hospitalYearlyDetails = useMemo(() => {
+    if (!hospital) return []
+    return yearlyPoolDetails
+      .filter((row) => row._id.hospital === hospital.name)
+      .filter((row) => selectedDetailYear === 'all' ? true : String(row.policyYear) === String(selectedDetailYear))
+      .sort((a, b) => {
+        if (a.policyYear !== b.policyYear) return b.policyYear - a.policyYear
+        return String(a._id.drg).localeCompare(String(b._id.drg))
+      })
+  }, [yearlyPoolDetails, hospital, selectedDetailYear])
 
   /* ── Derived tier summary ──────────────────────────────── */
   const tierSummary = useMemo(() => {
@@ -145,38 +186,44 @@ export default function HospitalDashboard() {
   }, [allHospitals])
 
   /* ── Build chart for single hospital (all DRGs) ────────── */
-  const hospitalChartConfig = useMemo(() => {
+  const hospitalPolicyCompareConfig = useMemo(() => {
     if (!hospital || !drgList.length) return null
     const labels = drgList
-    const oldData = labels.map(drg => hospital.drgs[drg].avgClaim)
+    const currentData = labels.map((drg) => {
+      const d = hospital.drgs[drg]
+      const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
+      return Math.round(netPerClaim * d.claimCount)
+    })
+    const singaporeData = labels.map((drg) => {
+      const d = hospital.drgs[drg]
+      const copay = hospital.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
+      return Math.round(Math.max(0, d.avgClaim - copay) * d.claimCount)
+    })
+    const chinaData = labels.map((drg) => Math.round(hospital.drgs[drg].reimbursedAmount || 0))
 
-    let newLabel, newData
-    if (policyToggle === 'singapore' || policyToggle === 'both') {
-      newLabel = 'Singapore Model'
-      newData = oldData.map(v => Math.round(v - (hospital.tier === 2 ? sgPvtCopay(v) : sgGovCopay(v))))
-    } else if (policyToggle === 'china') {
-      newLabel = 'China Model'
-      newData = oldData.map((v, i) => {
-        const d = hospital.drgs[labels[i]]
-        return Math.round(v * chinaBlendedRate(d.claimCount, d.quota, d.enforceQuota))
-      })
-    } else {
-      newLabel = 'Current Policy'
-      newData = oldData.map(v => Math.round(v - currentCopay(v)))
-    }
-
-    const datasets = [
-      { label: 'Current (Old) Policy', data: oldData.map(v => Math.round(v - currentCopay(v))), backgroundColor: 'rgba(231,76,60,0.6)', borderRadius: 4 },
-    ]
-    if (policyToggle !== 'current') {
-      datasets.push({ label: newLabel, data: newData, backgroundColor: 'rgba(46,204,113,0.6)', borderRadius: 4 })
-    }
-    if (policyToggle === 'both') {
+    const datasets = []
+    if (policyToggle === 'current' || policyToggle === 'both') {
       datasets.push({
-        label: 'China Model', data: oldData.map((v, i) => {
-          const d = hospital.drgs[labels[i]]
-          return Math.round(v * chinaBlendedRate(d.claimCount, d.quota, d.enforceQuota))
-        }), backgroundColor: 'rgba(76,110,245,0.6)', borderRadius: 4
+        label: 'Current (Malaysia)',
+        data: currentData,
+        backgroundColor: POLICY_COLORS.current,
+        borderRadius: 4
+      })
+    }
+    if (policyToggle === 'singapore' || policyToggle === 'both') {
+      datasets.push({
+        label: 'Singapore',
+        data: singaporeData,
+        backgroundColor: POLICY_COLORS.singapore,
+        borderRadius: 4
+      })
+    }
+    if (policyToggle === 'china' || policyToggle === 'both') {
+      datasets.push({
+        label: 'China',
+        data: chinaData,
+        backgroundColor: POLICY_COLORS.china,
+        borderRadius: 4
       })
     }
 
@@ -185,37 +232,125 @@ export default function HospitalDashboard() {
       data: { labels: labels.map(l => l.length > 16 ? l.slice(0, 14) + '…' : l), datasets },
       options: {
         responsive: true, indexAxis: 'y',
-        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${hospital.name} — Insurer Net Cost by DRG (RM)` } },
+        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${hospital.name} — Country Comparison (Insurer Paid, RM)` } },
         scales: { x: { title: { display: true, text: 'Insurer Net Cost (RM)' } } }
       }
     }
   }, [hospital, drgList, policyToggle])
 
+  const hospitalPoolConfig = useMemo(() => {
+    if (!hospital || !drgList.length) return null
+    const labels = drgList.map(l => l.length > 18 ? l.slice(0, 16) + '…' : l)
+    return {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Allocation Amount (Pool)',
+            data: drgList.map((drg) => Math.round(hospital.drgs[drg].poolAmount || 0)),
+            backgroundColor: 'rgba(149, 165, 166, 0.75)',
+            borderRadius: 4
+          },
+          {
+            label: 'Claim Request Amount',
+            data: drgList.map((drg) => Math.round(hospital.drgs[drg].claimRequestAmount || 0)),
+            backgroundColor: 'rgba(243, 156, 18, 0.75)',
+            borderRadius: 4
+          },
+          {
+            label: 'Actual Claim Amount (Paid)',
+            data: drgList.map((drg) => Math.round(hospital.drgs[drg].reimbursedAmount || 0)),
+            backgroundColor: POLICY_COLORS.china,
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          title: { display: true, text: `${hospital.name} — DRG Money Pool Tracking (RM)` }
+        },
+        scales: {
+          y: { title: { display: true, text: 'Amount (RM)' } },
+          x: { ticks: { maxRotation: 45, minRotation: 35 } }
+        }
+      }
+    }
+  }, [hospital, drgList])
+
+  const hospitalPenaltyConfig = useMemo(() => {
+    if (!hospital || !drgList.length) return null
+    return {
+      type: 'bar',
+      data: {
+        labels: drgList.map(l => l.length > 18 ? l.slice(0, 16) + '…' : l),
+        datasets: [
+          {
+            label: 'Penalty Amount',
+            data: drgList.map((drg) => Math.round(hospital.drgs[drg].penaltyAmount || 0)),
+            backgroundColor: 'rgba(192, 57, 43, 0.8)',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          title: { display: true, text: `${hospital.name} — Penalty Amount by DRG (RM)` }
+        },
+        scales: {
+          y: { title: { display: true, text: 'Penalty (RM)' } },
+          x: { ticks: { maxRotation: 45, minRotation: 35 } }
+        }
+      }
+    }
+  }, [hospital, drgList])
+
   /* ── Build chart for single DRG (all hospitals) ────────── */
   const drgChartConfig = useMemo(() => {
     if (!allHospitals.length || !selectedDRG) return null
-    const sorted = [...allHospitals].sort((a, b) => b.drgs[selectedDRG].avgClaim - a.drgs[selectedDRG].avgClaim)
+    const sorted = [...allHospitals]
+      .filter((h) => (h.drgs[selectedDRG]?.claimRequestAmount || 0) > 0)
+      .sort((a, b) => b.drgs[selectedDRG].claimRequestAmount - a.drgs[selectedDRG].claimRequestAmount)
+      .slice(0, 20)
     const labels = sorted.map(h => h.name.length > 20 ? h.name.slice(0, 18) + '…' : h.name)
-    const oldData = sorted.map(h => Math.round(h.drgs[selectedDRG].avgClaim - currentCopay(h.drgs[selectedDRG].avgClaim)))
+    const datasets = []
 
-    const datasets = [
-      { label: 'Current (Old) Policy', data: oldData, backgroundColor: sorted.map(h => h.tier === 2 ? 'rgba(231,76,60,0.6)' : 'rgba(46,204,113,0.6)'), borderRadius: 4 }
-    ]
+    if (policyToggle === 'current' || policyToggle === 'both') {
+      datasets.push({
+        label: 'Current (Malaysia)',
+        data: sorted.map((h) => {
+          const d = h.drgs[selectedDRG]
+          const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
+          return Math.round(netPerClaim * d.claimCount)
+        }),
+        backgroundColor: POLICY_COLORS.current,
+        borderRadius: 4
+      })
+    }
 
     if (policyToggle === 'singapore' || policyToggle === 'both') {
       datasets.push({
-        label: 'Singapore Model', data: sorted.map(h => {
-          const v = h.drgs[selectedDRG].avgClaim
-          return Math.round(v - (h.tier === 2 ? sgPvtCopay(v) : sgGovCopay(v)))
-        }), backgroundColor: 'rgba(46,204,113,0.4)', borderRadius: 4, borderColor: 'rgba(46,204,113,1)', borderWidth: 1
+        label: 'Singapore',
+        data: sorted.map((h) => {
+          const d = h.drgs[selectedDRG]
+          const copay = h.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
+          return Math.round(Math.max(0, d.avgClaim - copay) * d.claimCount)
+        }),
+        backgroundColor: POLICY_COLORS.singapore,
+        borderRadius: 4
       })
     }
+
     if (policyToggle === 'china' || policyToggle === 'both') {
       datasets.push({
-        label: 'China Model', data: sorted.map(h => {
-          const d = h.drgs[selectedDRG]
-          return Math.round(d.avgClaim * chinaBlendedRate(d.claimCount, d.quota, d.enforceQuota))
-        }), backgroundColor: 'rgba(76,110,245,0.4)', borderRadius: 4, borderColor: 'rgba(76,110,245,1)', borderWidth: 1
+        label: 'China',
+        data: sorted.map((h) => Math.round(h.drgs[selectedDRG].reimbursedAmount || 0)),
+        backgroundColor: POLICY_COLORS.china,
+        borderRadius: 4
       })
     }
 
@@ -224,8 +359,8 @@ export default function HospitalDashboard() {
       data: { labels, datasets },
       options: {
         responsive: true, indexAxis: 'y',
-        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${selectedDRG} — Cost Across All Hospitals (RM)` } },
-        scales: { x: { title: { display: true, text: 'Avg Claim Cost (RM)' } } }
+        plugins: { legend: { position: 'bottom' }, title: { display: true, text: `${selectedDRG} — Top 20 Hospitals Comparison (RM)` } },
+        scales: { x: { title: { display: true, text: 'Insurer Paid Amount (RM)' } } }
       }
     }
   }, [allHospitals, selectedDRG, policyToggle])
@@ -341,9 +476,22 @@ export default function HospitalDashboard() {
             </div>
           </div>
 
-          {/* Chart */}
+          {/* Policy Comparison Chart */}
           <div className="card" style={{ marginBottom: '1rem' }}>
-            <ChartComponent config={hospitalChartConfig} height={450} />
+            <ChartComponent config={hospitalPolicyCompareConfig} height={460} />
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+              Current = green, Singapore = blue, China = red
+            </p>
+          </div>
+
+          {/* Money Pool Tracking Charts */}
+          <div className="grid grid-2" style={{ marginBottom: '1rem', gap: '1rem' }}>
+            <div className="card">
+              <ChartComponent config={hospitalPoolConfig} height={360} />
+            </div>
+            <div className="card">
+              <ChartComponent config={hospitalPenaltyConfig} height={360} />
+            </div>
           </div>
 
           {/* DRG Table */}
@@ -352,26 +500,25 @@ export default function HospitalDashboard() {
             <div className="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>DRG Category</th><th>Avg Claim (RM)</th><th>Claims</th><th>Quota</th><th>Usage %</th><th>O/E</th><th>Status</th></tr>
+                  <tr><th>DRG Category</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Usage %</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {drgList.map(drg => {
                     const d = hospital.drgs[drg]
-                    if (!d || d.claimCount === 0) return null
-                    const pct = d.enforceQuota ? Math.round((d.claimCount / d.quota) * 100) : null
-                    const zone = !d.enforceQuota ? 'badge-warning' : pct <= 120 ? 'badge-success' : pct <= 150 ? 'badge-warning' : 'badge-danger'
-                    const zoneLabel = !d.enforceQuota ? 'Observe' : pct <= 120 ? 'Normal' : pct <= 150 ? 'Watch' : 'Over'
+                    if (!d || d.claimRequestAmount === 0) return null
+                    const pct = d.enforceQuota && d.usagePct !== null ? Math.round(d.usagePct) : null
                     return (
                       <tr key={drg}>
                         <td style={{ fontWeight: 500 }}>{drg}</td>
-                        <td>RM {d.avgClaim.toLocaleString()}</td>
-                        <td>{d.claimCount}</td>
-                        <td>{d.enforceQuota ? d.quota : 'N/A'}</td>
+                        <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
+                        <td>RM {d.claimRequestAmount.toLocaleString()}</td>
+                        <td>RM {d.reimbursedAmount.toLocaleString()}</td>
+                        <td>RM {d.penaltyAmount.toLocaleString()}</td>
                         <td>
                           {d.enforceQuota ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <div className="progress-bar" style={{ width: 60, height: 6 }}>
-                                <div className={`progress-fill ${pct <= 120 ? 'green' : pct <= 150 ? 'yellow' : 'red'}`}
+                                <div className={`progress-fill ${pct <= 100 ? 'green' : pct <= 120 ? 'yellow' : 'red'}`}
                                   style={{ width: `${Math.min(pct, 200) / 2}%` }} />
                               </div>
                               <span style={{ fontSize: 'var(--font-size-xs)' }}>{pct}%</span>
@@ -380,11 +527,43 @@ export default function HospitalDashboard() {
                             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>N/A</span>
                           )}
                         </td>
-                        <td>{d.oe}</td>
-                        <td><span className={`badge ${zone}`}>{zoneLabel}</span></td>
+                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{d.statusZone}</span></td>
                       </tr>
                     )
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Yearly Detail Ledger */}
+          <div className="card" style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <h4 style={{ margin: 0 }}>📒 Yearly DRG Pool Details — {hospital.name}</h4>
+              <div style={{ minWidth: 180 }}>
+                <div className="input-label" style={{ marginBottom: '0.25rem' }}>Policy Year</div>
+                <select className="input" value={selectedDetailYear} onChange={(e) => setSelectedDetailYear(e.target.value)}>
+                  <option value="all">All Years</option>
+                  {yearlyOptions.map((y) => <option key={y} value={String(y)}>{y}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>Year</th><th>DRG</th><th>Pool (RM)</th><th>Claim Amount (RM)</th><th>Penalty (RM)</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {hospitalYearlyDetails.map((row, idx) => (
+                    <tr key={`${row.policyYear}-${row._id.drg}-${idx}`}>
+                      <td>{row.policyYear}</td>
+                      <td>{row._id.drg}</td>
+                      <td>{row.enforceQuota ? `RM ${Math.round(row.poolAmount || 0).toLocaleString()}` : 'N/A'}</td>
+                      <td>RM {Math.round(row.claimRequestAmount || 0).toLocaleString()}</td>
+                      <td>RM {Math.round(row.penaltyAmount || 0).toLocaleString()}</td>
+                      <td><span className={`badge ${zoneToBadge(row.statusZone)}`}>{row.statusZone}</span></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -398,7 +577,7 @@ export default function HospitalDashboard() {
           <div className="card" style={{ marginBottom: '1rem' }}>
             <ChartComponent config={drgChartConfig} height={700} />
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
-              🟢 Green bars = Preferred (Tier 1) hospitals &nbsp;|&nbsp; 🔴 Red bars = Standard (Tier 2) hospitals
+              Top 20 hospitals are shown for readability. Current = green, Singapore = blue, China = red.
             </p>
           </div>
 
@@ -408,20 +587,22 @@ export default function HospitalDashboard() {
             <div className="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>Hospital</th><th>Tier</th><th>Region</th><th>Avg Claim (RM)</th><th>Claims</th><th>O/E</th></tr>
+                  <tr><th>Hospital</th><th>Tier</th><th>Region</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Status</th></tr>
                 </thead>
                 <tbody>
-                  {[...allHospitals].sort((a, b) => b.drgs[selectedDRG].avgClaim - a.drgs[selectedDRG].avgClaim).map(h => {
+                  {[...allHospitals].sort((a, b) => b.drgs[selectedDRG].claimRequestAmount - a.drgs[selectedDRG].claimRequestAmount).map(h => {
                     const d = h.drgs[selectedDRG]
-                    if (!d || d.claimCount === 0) return null
+                    if (!d || d.claimRequestAmount === 0) return null
                     return (
                       <tr key={h.id}>
                         <td style={{ fontWeight: 500 }}>{h.name}</td>
                         <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>{h.tier === 1 ? 'Preferred' : 'Standard'}</span></td>
                         <td>{h.region}</td>
-                        <td>RM {d.avgClaim.toLocaleString()}</td>
-                        <td>{d.claimCount}</td>
-                        <td>{d.oe}</td>
+                        <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
+                        <td>RM {d.claimRequestAmount.toLocaleString()}</td>
+                        <td>RM {d.reimbursedAmount.toLocaleString()}</td>
+                        <td>RM {d.penaltyAmount.toLocaleString()}</td>
+                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{d.statusZone}</span></td>
                       </tr>
                     )
                   })}
