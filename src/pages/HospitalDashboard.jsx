@@ -1,6 +1,28 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Chart, registerables } from 'chart.js'
+import { AgCharts } from "ag-charts-react";
+import {
+  AnimationModule,
+  BoxPlotSeriesModule,
+  CategoryAxisModule,
+  ContextMenuModule,
+  CrosshairModule,
+  LegendModule,
+  ModuleRegistry,
+  NumberAxisModule,
+} from "ag-charts-enterprise";
+
 Chart.register(...registerables)
+
+ModuleRegistry.registerModules([
+  AnimationModule,
+  BoxPlotSeriesModule,
+  CategoryAxisModule,
+  CrosshairModule,
+  LegendModule,
+  NumberAxisModule,
+  ContextMenuModule,
+]);
 
 const POLICY_COLORS = {
   current: 'rgba(46, 204, 113, 0.75)', // green
@@ -624,13 +646,10 @@ export default function HospitalDashboard() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div className="card" style={{ width: '100%' }}>
-              <ChartComponent config={hospitalPoolConfig} height={320} />
+              <ChartComponent config={hospitalPoolConfig} height={600} />
             </div>
             <div className="card" style={{ width: '100%' }}>
-              <ChartComponent config={hospitalPenaltyConfig} height={320} />
-            </div>
-            <div className="card" style={{ width: '100%' }}>
-              <ChartComponent config={hospitalPolicyCompareConfig} height={320} />
+              <ChartComponent config={hospitalPenaltyConfig} height={600} />
             </div>
           </div>
 
@@ -704,31 +723,42 @@ export default function HospitalDashboard() {
 
           <div className="card" style={{ marginBottom: '1.25rem' }}>
             <h4 style={{ marginBottom: '1.25rem' }}>🏆 Inter-Hospital Performance Comparison</h4>
-            <div style={{ height: '300px', width: '100%', position: 'relative', borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '1rem 0 3rem 4rem' }}>
-              <div style={{ position: 'absolute', left: 0, top: '25%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: 600 }}>Tier 1</div>
-              <div style={{ position: 'absolute', left: 0, top: '75%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: 600 }}>Tier 2</div>
-
-              {[1, 2].map((tier, i) => {
-                const stats = boxPlotStats.find(s => s._id.drg === selectedDRG && s._id.tier === tier && s._id.year === parseInt(selectedYear === '23-25' ? '2025' : selectedYear))
-                if (!stats) return <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: '10%', color: 'var(--text-muted)' }}>No data for Tier {tier}</div>
-
-                const scale = (val) => `${((val - stats.min) / (stats.max - stats.min || 1)) * 80 + 10}%`
-
-                return (
-                  <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: 0, right: 0, height: '40px', transform: 'translateY(-50%)' }}>
-                    <div style={{ position: 'absolute', left: scale(stats.min), right: `calc(100% - ${scale(stats.max)})`, top: '50%', height: '1px', background: 'var(--text-primary)' }}></div>
-                    <div style={{ position: 'absolute', left: scale(stats.q1), right: `calc(100% - ${scale(stats.q3)})`, top: '10%', bottom: '10%', background: tier === 1 ? 'rgba(46,204,113,0.2)' : 'rgba(231,76,60,0.2)', border: `1px solid ${tier === 1 ? 'var(--success)' : 'var(--danger)'}`, borderRadius: '2px' }}></div>
-                    <div style={{ position: 'absolute', left: scale(stats.median), top: '10%', bottom: '10%', width: '2px', background: tier === 1 ? 'var(--success)' : 'var(--danger)' }}></div>
-                    {stats.outliers.map((o, idx) => (
-                      <div key={idx} style={{ position: 'absolute', left: scale(o), top: '50%', width: '4px', height: '4px', borderRadius: '50%', background: 'var(--text-muted)', transform: 'translate(-50%, -50%)' }}></div>
-                    ))}
-                  </div>
-                )
-              })}
-
-              <div style={{ position: 'absolute', bottom: '10px', left: '10%', right: '10%', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
-                <span>Min</span><span>Q1</span><span>Median</span><span>Q3</span><span>Max</span>
-              </div>
+            <div style={{ height: '400px', width: '100%' }}>
+              <AgCharts options={{
+                data: [1, 2].map(tier => {
+                  const s = boxPlotStats.find(st => st._id.drg === selectedDRG && st._id.tier === tier && st._id.year === parseInt(selectedYear === '23-25' ? '2025' : selectedYear))
+                  return {
+                    tierLabel: `Tier ${tier}`,
+                    min: s?.min || 0,
+                    q1: s?.q1 || 0,
+                    median: s?.median || 0,
+                    q3: s?.q3 || 0,
+                    max: s?.max || 0
+                  }
+                }),
+                title: { text: `${shortenDRG(selectedDRG)} — Distribution` },
+                series: [
+                  {
+                    type: "box-plot",
+                    direction: "horizontal",
+                    yName: "Claim Amount (RM)",
+                    xKey: "tierLabel",
+                    xName: "Hospital Tier",
+                    minKey: "min",
+                    q1Key: "q1",
+                    medianKey: "median",
+                    q3Key: "q3",
+                    maxKey: "max",
+                    fill: 'rgba(52, 152, 219, 0.2)',
+                    stroke: 'var(--accent)',
+                    whisker: { stroke: 'var(--text-primary)' }
+                  }
+                ],
+                axes: [
+                  { type: 'category', position: 'left' },
+                  { type: 'number', position: 'bottom', title: { text: 'Amount (RM)' } }
+                ]
+              }} />
             </div>
           </div>
 
