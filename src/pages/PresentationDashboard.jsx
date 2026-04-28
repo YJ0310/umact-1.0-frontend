@@ -120,7 +120,94 @@ export default function PresentationDashboard() {
       })
   }, [])
 
-  if (loading) return <div className="container"><p>Loading executive insights...</p></div>
+  if (loading) return (
+    <div className="container" style={{ padding: '2rem 0' }}>
+      {/* Header skeleton */}
+      <div className="dashboard-header animate-in" style={{ marginBottom: '1.25rem' }}>
+        <div>
+          <div className="skeleton skeleton-title" style={{ marginBottom: '0.75rem', width: '350px' }} />
+          <div className="skeleton skeleton-text" style={{ marginBottom: '0.5rem', width: '280px' }} />
+          <div className="skeleton skeleton-text" style={{ width: '200px' }} />
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="skeleton skeleton-card" style={{ width: '120px', height: '32px' }} />
+          <div className="skeleton skeleton-card" style={{ width: '140px', height: '32px' }} />
+        </div>
+      </div>
+
+      {/* Tabs skeleton */}
+      <div className="tabs animate-in" style={{ marginBottom: '1.25rem', animationDelay: '0.05s' }}>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="skeleton skeleton-card" style={{ flex: 1, height: '36px', marginRight: '0.5rem' }} />
+        ))}
+      </div>
+
+      {/* Hero banner skeleton */}
+      <div className="card animate-in" style={{ animationDelay: '0.1s', marginBottom: '1.25rem', background: 'var(--bg-card)', minHeight: '120px' }}>
+        <div className="skeleton skeleton-title" style={{ marginBottom: '0.75rem', width: '60%' }} />
+        <div className="skeleton skeleton-text" style={{ marginBottom: '0.5rem', width: '85%' }} />
+        <div className="skeleton skeleton-text" style={{ width: '70%' }} />
+      </div>
+
+      {/* Findings grid skeleton */}
+      <div className="grid grid-2 animate-in" style={{ animationDelay: '0.15s', marginBottom: '1.25rem', gap: '1rem' }}>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="card" style={{ minHeight: '180px' }}>
+            <div className="skeleton skeleton-text" style={{ marginBottom: '0.75rem', width: '40%' }} />
+            <div className="skeleton skeleton-title" style={{ marginBottom: '0.75rem', width: '60%' }} />
+            <div className="skeleton skeleton-text" style={{ marginBottom: '1rem', width: '50%' }} />
+            <div className="skeleton skeleton-card" style={{ height: '60px' }} />
+          </div>
+        ))}
+      </div>
+
+      {/* Content sections skeleton */}
+      <div className="grid grid-2 animate-in" style={{ animationDelay: '0.2s', gap: '1rem' }}>
+        <div className="card" style={{ minHeight: '280px' }}>
+          <div className="skeleton skeleton-title" style={{ marginBottom: '1rem', width: '70%' }} />
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} style={{ marginBottom: '0.75rem' }}>
+              <div className="skeleton skeleton-text" style={{ marginBottom: '0.35rem', width: '45%' }} />
+              <div className="skeleton skeleton-text" style={{ width: '60%' }} />
+            </div>
+          ))}
+        </div>
+        <div className="card" style={{ minHeight: '280px' }}>
+          <div className="skeleton skeleton-title" style={{ marginBottom: '1rem', width: '65%' }} />
+          {[1, 2].map(i => (
+            <div key={i} style={{ marginBottom: '1rem' }}>
+              <div className="skeleton skeleton-chart" style={{ height: '100px' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Table skeleton */}
+      <div className="card animate-in" style={{ animationDelay: '0.25s', marginTop: '1.25rem' }}>
+        <div className="skeleton skeleton-title" style={{ marginBottom: '1rem', width: '50%' }} />
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                {[1, 2, 3].map(i => (
+                  <th key={i}><div className="skeleton skeleton-text" style={{ width: '80%' }} /></th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[1, 2, 3, 4].map(row => (
+                <tr key={row}>
+                  {[1, 2, 3].map(col => (
+                    <td key={col}><div className="skeleton skeleton-text" style={{ width: '75%' }} /></td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
 
   const fmt = (val) => new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', maximumFractionDigits: 0 }).format(val)
   const fmtM = (val) => `RM ${(val / 1000000).toFixed(2)}M`
