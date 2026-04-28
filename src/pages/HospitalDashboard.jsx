@@ -145,7 +145,7 @@ function UsageBar({ pct }) {
   let color = 'var(--success)'
   if (pct > 120) color = 'var(--danger)'
   else if (pct > 100) color = 'var(--warning)'
-  
+
   return (
     <div style={{ width: '100%', minWidth: '60px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
@@ -435,7 +435,7 @@ export default function HospitalDashboard() {
         },
         scales: {
           x: { title: { display: true, text: 'Amount (RM)' } },
-          y: { 
+          y: {
             ticks: { font: { size: 11, weight: 'bold' } },
             grid: { display: false }
           }
@@ -471,7 +471,7 @@ export default function HospitalDashboard() {
         },
         scales: {
           x: { title: { display: true, text: 'Penalty (RM)' } },
-          y: { 
+          y: {
             ticks: { font: { size: 11, weight: 'bold' } },
             grid: { display: false }
           }
@@ -683,8 +683,8 @@ export default function HospitalDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(selectedYear === '23-25' 
-                    ? yearlyPoolDetails.filter(d => d._id.hospital === hospital.name).sort((a,b) => a.policyYear - b.policyYear || a._id.drg.localeCompare(b._id.drg))
+                  {(selectedYear === '23-25'
+                    ? yearlyPoolDetails.filter(d => d._id.hospital === hospital.name).sort((a, b) => a.policyYear - b.policyYear || a._id.drg.localeCompare(b._id.drg))
                     : (drgGroupMode === 'category' ? Object.values(groupedHospitalData) : drgList.filter(d => hospital.drgs[d]).map(d => ({ ...hospital.drgs[d], name: d })))
                   ).map((d, i) => (
                     <tr key={i}>
@@ -742,50 +742,49 @@ export default function HospitalDashboard() {
           </div>
 
           {/* 2. AgCharts Box Plot */}
-            <h4 style={{ marginBottom: '1.25rem' }}>🏆 Inter-Hospital Performance Comparison</h4>
-            <div style={{ height: '400px', width: '100%' }}>
-              <AgCharts options={{
-                data: [1, 2].map(tier => {
-                  const s = boxPlotStats.find(st => st._id.drg === selectedDRG && st._id.tier === tier && st._id.year === parseInt(selectedYear === '23-25' ? '2025' : selectedYear))
-                  return {
-                    tierLabel: `Tier ${tier}`,
-                    min: s?.min || 0,
-                    q1: s?.q1 || 0,
-                    median: s?.median || 0,
-                    q3: s?.q3 || 0,
-                    max: s?.max || 0
-                  }
-                }),
-                title: { text: `${shortenDRG(selectedDRG)} — Distribution` },
-                series: [
-                  {
-                    type: "box-plot",
-                    direction: "horizontal",
-                    yName: "Claim Amount (RM)",
-                    xKey: "tierLabel",
-                    xName: "Hospital Tier",
-                    minKey: "min",
-                    q1Key: "q1",
-                    medianKey: "median",
-                    q3Key: "q3",
-                    maxKey: "max",
-                    fill: 'rgba(52, 152, 219, 0.2)',
-                    stroke: 'var(--accent)',
-                    whisker: { stroke: 'var(--text-primary)' }
-                  }
-                ],
-                axes: [
-                  { type: 'category', position: 'left' },
-                  { type: 'number', position: 'bottom', title: { text: 'Amount (RM)' } }
-                ]
-              }} />
-            </div>
+          <h4 style={{ marginBottom: '1.25rem' }}>🏆 Inter-Hospital Performance Comparison</h4>
+          <div style={{ height: '400px', width: '100%' }}>
+            <AgCharts options={{
+              data: [1, 2].map(tier => {
+                const s = boxPlotStats.find(st => st._id.drg === selectedDRG && st._id.tier === tier && st._id.year === parseInt(selectedYear === '23-25' ? '2025' : selectedYear))
+                return {
+                  tierLabel: `Tier ${tier}`,
+                  min: s?.min || 0,
+                  q1: s?.q1 || 0,
+                  median: s?.median || 0,
+                  q3: s?.q3 || 0,
+                  max: s?.max || 0
+                }
+              }),
+              title: { text: `${shortenDRG(selectedDRG)} — Distribution` },
+              series: [
+                {
+                  type: "box-plot",
+                  direction: "horizontal",
+                  yName: "Claim Amount (RM)",
+                  xKey: "tierLabel",
+                  xName: "Hospital Tier",
+                  minKey: "min",
+                  q1Key: "q1",
+                  medianKey: "median",
+                  q3Key: "q3",
+                  maxKey: "max",
+                  fill: 'rgba(52, 152, 219, 0.2)',
+                  stroke: 'var(--accent)',
+                  whisker: { stroke: 'var(--text-primary)' }
+                }
+              ],
+              axes: [
+                { type: 'category', position: 'left' },
+                { type: 'number', position: 'bottom', title: { text: 'Amount (RM)' } }
+              ]
+            }} />
           </div>
 
-          {(selectedYear === '2024' || selectedYear === '2025') ? (() => {
+          {selectedYear === '2024' || selectedYear === '2025' ? (() => {
             const baseYear = parseInt(selectedYear) - 1;
             const relevantStats = boxPlotStats.filter(s => s._id.drg === selectedDRG && s._id.year === baseYear);
-            const baseVal = relevantStats.length > 0 
+            const baseVal = relevantStats.length > 0
               ? Math.round(relevantStats.reduce((acc, s) => acc + s.median, 0) / relevantStats.length)
               : 0;
             const riskAdjuster = 1.05;
@@ -833,9 +832,9 @@ export default function HospitalDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {yearlyPoolDetails.filter(d => 
+                  {yearlyPoolDetails.filter(d =>
                     d._id.drg === selectedDRG && (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
-                  ).sort((a,b) => a.policyYear - b.policyYear).map((d, i) => {
+                  ).sort((a, b) => a.policyYear - b.policyYear).map((d, i) => {
                     const h = allHospitals.find(x => x.name === d._id.hospital)
                     return (
                       <tr key={i}>
