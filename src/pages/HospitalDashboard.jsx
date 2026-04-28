@@ -71,6 +71,7 @@ export default function HospitalDashboard() {
   const [selectedDRG, setSelectedDRG] = useState('')
   const [policyToggle, setPolicyToggle] = useState('current') // 'current' | 'singapore' | 'china' | 'both'
   const [selectedDetailYear, setSelectedDetailYear] = useState('all')
+  const [hospitalSearch, setHospitalSearch] = useState('')
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString())
 
   useEffect(() => {
@@ -147,6 +148,19 @@ export default function HospitalDashboard() {
   }, [])
 
   const hospital = allHospitals.find(h => h.id === selectedHospital)
+  const filteredHospitals = useMemo(() => {
+    const term = hospitalSearch.trim().toLowerCase()
+    if (!term) return allHospitals
+    return allHospitals.filter((h) => h.name.toLowerCase().includes(term))
+  }, [allHospitals, hospitalSearch])
+
+  useEffect(() => {
+    if (!filteredHospitals.length) return
+    const exists = filteredHospitals.some((h) => h.id === selectedHospital)
+    if (!exists) {
+      setSelectedHospital(filteredHospitals[0].id)
+    }
+  }, [filteredHospitals, selectedHospital])
   const yearlyOptions = useMemo(() => {
     return [...new Set(yearlyPoolDetails.map(r => r.policyYear))].sort((a, b) => a - b)
   }, [yearlyPoolDetails])
@@ -180,8 +194,8 @@ export default function HospitalDashboard() {
       return (all.reduce((a, b) => a + b, 0) / all.length).toFixed(3)
     }
     return {
-      tier1: { count: t1.length, avgClaim: avgClaim(t1), avgOE: avgOE(t1), label: 'Preferred Providers', desc: 'Lower cost, high efficiency — your best value option.' },
-      tier2: { count: t2.length, avgClaim: avgClaim(t2), avgOE: avgOE(t2), label: 'Standard Providers', desc: 'Higher cost — claims may be benchmarked against fair value.' },
+      tier1: { count: t1.length, avgClaim: avgClaim(t1), avgOE: avgOE(t1), label: 'Tier 1 Hospitals', desc: 'Lower cost, high efficiency — benchmark group.' },
+      tier2: { count: t2.length, avgClaim: avgClaim(t2), avgOE: avgOE(t2), label: 'Tier 2 Hospitals', desc: 'Higher cost — claims may be benchmarked against Tier 1.' },
     }
   }, [allHospitals])
 
@@ -202,7 +216,7 @@ export default function HospitalDashboard() {
     const chinaData = labels.map((drg) => Math.round(hospital.drgs[drg].reimbursedAmount || 0))
 
     const datasets = []
-    if (policyToggle === 'current' || policyToggle === 'both') {
+    if (policyToggle === 'current' || policyToggle === 'singapore' || policyToggle === 'china' || policyToggle === 'both') {
       datasets.push({
         label: 'Current (Malaysia)',
         data: currentData,
@@ -319,7 +333,7 @@ export default function HospitalDashboard() {
     const labels = sorted.map(h => h.name.length > 20 ? h.name.slice(0, 18) + '…' : h.name)
     const datasets = []
 
-    if (policyToggle === 'current' || policyToggle === 'both') {
+    if (policyToggle === 'current' || policyToggle === 'singapore' || policyToggle === 'china' || policyToggle === 'both') {
       datasets.push({
         label: 'Current (Malaysia)',
         data: sorted.map((h) => {
@@ -380,13 +394,13 @@ export default function HospitalDashboard() {
       data: {
         labels: drgList.map(l => l.length > 14 ? l.slice(0, 12) + '…' : l),
         datasets: [
-          { label: 'Preferred (Tier 1)', data: avgByDrg(t1), backgroundColor: 'rgba(46,204,113,0.6)', borderRadius: 4 },
-          { label: 'Standard (Tier 2)', data: avgByDrg(t2), backgroundColor: 'rgba(231,76,60,0.6)', borderRadius: 4 },
+          { label: 'Tier 1', data: avgByDrg(t1), backgroundColor: 'rgba(46,204,113,0.6)', borderRadius: 4 },
+          { label: 'Tier 2', data: avgByDrg(t2), backgroundColor: 'rgba(231,76,60,0.6)', borderRadius: 4 },
         ]
       },
       options: {
         responsive: true, indexAxis: 'y',
-        plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Average Claim by DRG — Preferred vs Standard Hospitals' } },
+        plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Average Claim by DRG — Tier 1 vs Tier 2' } },
         scales: { x: { title: { display: true, text: 'Avg Claim (RM)' } } }
       }
     }
@@ -442,10 +456,24 @@ export default function HospitalDashboard() {
           {viewMode === 'byHospital' && (
             <div style={{ flex: 1 }}>
               <div className="input-label" style={{ marginBottom: '0.25rem' }}>Select Hospital</div>
-              <select className="input" value={selectedHospital} onChange={e => setSelectedHospital(e.target.value)} style={{ width: '100%' }}>
-                {allHospitals.map(h => (
-                  <option key={h.id} value={h.id}>{h.name} ({h.tier === 1 ? 'Preferred' : 'Standard'}) — {h.region}</option>
-                ))}
+              <input
+                className="input"
+                placeholder="Search hospital (60 total)"
+                value={hospitalSearch}
+                onChange={(e) => setHospitalSearch(e.target.value)}
+                style={{ marginBottom: '0.5rem' }}
+              />
+              <select
+                className="input"
+                value={selectedHospital}
+                onChange={e => setSelectedHospital(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                {filteredHospitals.length ? filteredHospitals.map(h => (
+                  <option key={h.id} value={h.id}>{h.name} (Tier {h.tier}) — {h.region}</option>
+                )) : (
+                  <option value="">No matching hospitals</option>
+                )}
               </select>
             </div>
           )}
@@ -471,7 +499,7 @@ export default function HospitalDashboard() {
                 <span style={{ color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>{hospital.region}</span>
               </div>
               <span className={`badge ${hospital.tier === 1 ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: 'var(--font-size-sm)' }}>
-                {hospital.tier === 1 ? '⭐ Preferred Provider' : '⚠️ Standard Provider'}
+                {hospital.tier === 1 ? '⭐ Tier 1' : '⚠️ Tier 2'}
               </span>
             </div>
           </div>
@@ -596,7 +624,7 @@ export default function HospitalDashboard() {
                     return (
                       <tr key={h.id}>
                         <td style={{ fontWeight: 500 }}>{h.name}</td>
-                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>{h.tier === 1 ? 'Preferred' : 'Standard'}</span></td>
+                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</span></td>
                         <td>{h.region}</td>
                         <td>{d.enforceQuota ? `RM ${d.poolAmount.toLocaleString()}` : 'N/A'}</td>
                         <td>RM {d.claimRequestAmount.toLocaleString()}</td>
@@ -664,7 +692,7 @@ export default function HospitalDashboard() {
                     return (
                       <tr key={h.id}>
                         <td style={{ fontWeight: 500 }}>{h.name}</td>
-                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>{h.tier === 1 ? '⭐ Preferred' : '⚠️ Standard'}</span></td>
+                        <td><span className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</span></td>
                         <td>{h.region}</td>
                         <td>RM {avgC.toLocaleString()}</td>
                         <td>{avgOE}</td>
