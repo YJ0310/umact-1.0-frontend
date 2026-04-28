@@ -105,11 +105,36 @@ function ChartComponent({ config, height = 300 }) {
   useEffect(() => {
     if (chartRef.current) chartRef.current.destroy()
     if (!ref.current) return
-    chartRef.current = new Chart(ref.current.getContext('2d'), config)
+    chartRef.current = new Chart(ref.current.getContext('2d'), {
+      ...config,
+      options: {
+        ...config.options,
+        maintainAspectRatio: false,
+      }
+    })
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [JSON.stringify(config)])
+  
+  return <div style={{ height: currentHeight, width: '100%', position: 'relative' }}><canvas ref={ref} /></div>
+}
 
-  return <canvas ref={ref} style={{ maxHeight: currentHeight }} />
+function UsageBar({ pct }) {
+  const safePct = Math.min(pct || 0, 150)
+  let color = 'var(--success)'
+  if (safePct > 120) color = 'var(--danger)'
+  else if (safePct > 100) color = 'var(--warning)'
+  
+  return (
+    <div style={{ width: '100%', minWidth: '60px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
+        <span style={{ fontWeight: 600 }}>{pct ? `${pct.toFixed(1)}%` : '0%'}</span>
+      </div>
+      <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+        <div style={{ width: `${Math.min(safePct, 100)}%`, height: '100%', background: color, transition: 'width 0.3s' }}></div>
+        {safePct > 100 && <div style={{ width: `${Math.min(safePct - 100, 50)}%`, height: '100%', background: 'var(--danger)', opacity: 0.6 }}></div>}
+      </div>
+    </div>
+  )
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -119,6 +144,7 @@ export default function HospitalDashboard() {
   const [allHospitals, setAllHospitals] = useState([])
   const [drgList, setDrgList] = useState([])
   const [yearlyPoolDetails, setYearlyPoolDetails] = useState([])
+  const [boxPlotStats, setBoxPlotStats] = useState([])
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -145,10 +171,11 @@ export default function HospitalDashboard() {
       .then(res => res.json())
       .then(result => {
         if (result.success) {
-          const { hospitals, hospitalDRG, yearlyPoolDetails: yearlyDetails = [], drgCatalog = [] } = result.data
+          const { hospitals, hospitalDRG, yearlyPoolDetails: yearlyDetails = [], drgCatalog = [], boxPlotStats: bStats = [] } = result.data
           const uniqueDRGs = drgCatalog.length ? drgCatalog : []
           setDrgList(uniqueDRGs)
           setYearlyPoolDetails(yearlyDetails)
+          setBoxPlotStats(bStats)
 
           const mapped = hospitals.map(h => {
             const tier = normalizeTier(h.tier || h.final_tier)
@@ -359,19 +386,19 @@ export default function HospitalDashboard() {
         labels: chartLabels.map(shortenDRG),
         datasets: [
           {
-            label: 'Allocation Amount',
+            label: 'Allocation',
             data: chartLabels.map((drg) => Math.round(sourceData[drg]?.poolAmount || 0)),
-            backgroundColor: 'rgba(149, 165, 166, 0.75)',
+            backgroundColor: 'rgba(149, 165, 166, 0.6)',
             borderRadius: 4
           },
           {
-            label: 'Claim Request Amount',
+            label: 'Request',
             data: chartLabels.map((drg) => Math.round(sourceData[drg]?.claimRequestAmount || 0)),
-            backgroundColor: 'rgba(243, 156, 18, 0.75)',
+            backgroundColor: 'rgba(243, 156, 18, 0.7)',
             borderRadius: 4
           },
           {
-            label: 'Actual Claim Amount (Paid)',
+            label: 'Actual Reimbursed',
             data: chartLabels.map((drg) => Math.round(sourceData[drg]?.reimbursedAmount || 0)),
             backgroundColor: POLICY_COLORS.china,
             borderRadius: 4
@@ -379,14 +406,15 @@ export default function HospitalDashboard() {
         ]
       },
       options: {
+        indexAxis: 'y',
         responsive: true,
         plugins: {
           legend: { position: 'bottom' },
-          title: { display: true, text: `${hospital.name} — Money Pool Allocation Tracking (RM)` }
+          title: { display: true, text: `${hospital.name} — Allocation Tracking (RM)` }
         },
         scales: {
-          y: { title: { display: true, text: 'Amount (RM)' } },
-          x: { ticks: { maxRotation: 45, minRotation: 35 } }
+          x: { title: { display: true, text: 'Amount (RM)' } },
+          y: { ticks: { font: { size: 10 } } }
         }
       }
     }
@@ -409,14 +437,65 @@ export default function HospitalDashboard() {
         ]
       },
       options: {
+        indexAxis: 'y',
         responsive: true,
         plugins: {
           legend: { position: 'bottom' },
-          title: { display: true, text: `${hospital.name} — Penalty Amount by DRG (RM)` }
+          title: { display: true, text: `${hospital.name} — Penalty Distribution (RM)` }
         },
         scales: {
-          y: { title: { display: true, text: 'Penalty (RM)' } },
-          x: { ticks: { maxRotation: 45, minRotation: 35 } }
+          x: { title: { display: true, text: 'Penalty (RM)' } }
+        }
+      }
+    }
+  }, [hospital, chartLabels, drgGroupMode, groupedHospitalData])
+
+  const hospitalPolicyCompareConfig = useMemo(() => {
+    if (!hospital || !chartLabels.length) return null
+    const sourceData = drgGroupMode === 'category' ? groupedHospitalData : hospital.drgs
+    
+    return {
+      type: 'bar',
+      data: {
+        labels: chartLabels.map(shortenDRG),
+        datasets: [
+          {
+            label: 'Current (Malaysia)',
+            data: chartLabels.map(drg => {
+              const d = sourceData[drg]
+              const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
+              return Math.round(netPerClaim * d.claimCount)
+            }),
+            backgroundColor: POLICY_COLORS.current,
+            borderRadius: 4
+          },
+          {
+            label: 'Singapore Model',
+            data: chartLabels.map(drg => {
+              const d = sourceData[drg]
+              const copay = hospital.tier === 2 ? sgPvtCopay(d.avgClaim) : sgGovCopay(d.avgClaim)
+              return Math.round(Math.max(0, d.avgClaim - copay) * d.claimCount)
+            }),
+            backgroundColor: POLICY_COLORS.singapore,
+            borderRadius: 4
+          },
+          {
+            label: 'China Model (Quota)',
+            data: chartLabels.map(drg => Math.round(sourceData[drg]?.reimbursedAmount || 0)),
+            backgroundColor: POLICY_COLORS.china,
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          title: { display: true, text: `${hospital.name} — Policy Savings Comparison (RM)` }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Insurer Paid Amount (RM)' } }
         }
       }
     }
@@ -536,10 +615,10 @@ export default function HospitalDashboard() {
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '10px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Policy Year</div>
-              <select
-                className="input"
-                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '0.4rem 0.75rem', borderRadius: '8px', cursor: 'pointer' }}
+              <div className="input-label" style={{ marginBottom: '0.35rem', color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>📅 Policy Year</div>
+              <select 
+                className="input" 
+                style={{ background: 'rgba(255,255,255,1)', border: 'none', color: 'var(--text-main)', padding: '0.5rem 0.85rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
               >
@@ -594,16 +673,15 @@ export default function HospitalDashboard() {
             </h4>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="card">
-              <ChartComponent config={hospitalPoolConfig} height={isMobile ? 280 : 360} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            <div className="card" style={{ width: '100%' }}>
+              <ChartComponent config={hospitalPoolConfig} height={320} />
             </div>
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div style={{ width: '100%', maxWidth: '400px' }}>
-                  <ChartComponent config={hospitalPenaltyConfig} height={isMobile ? 280 : 360} />
-                </div>
-              </div>
+            <div className="card" style={{ width: '100%' }}>
+              <ChartComponent config={hospitalPenaltyConfig} height={320} />
+            </div>
+            <div className="card" style={{ width: '100%' }}>
+              <ChartComponent config={hospitalPolicyCompareConfig} height={320} />
             </div>
           </div>
 
@@ -640,7 +718,7 @@ export default function HospitalDashboard() {
                       <td>RM {d.claimRequestAmount.toLocaleString()}</td>
                       <td style={{ color: 'var(--success)', fontWeight: 600 }}>RM {d.reimbursedAmount.toLocaleString()}</td>
                       <td style={{ color: d.penaltyAmount > 0 ? 'var(--danger)' : 'inherit' }}>RM {d.penaltyAmount.toLocaleString()}</td>
-                      <td>{d.usagePct ? `${d.usagePct.toFixed(1)}%` : '-'}</td>
+                      <td><UsageBar pct={d.usagePct} /></td>
                       <td>
                         <span className={`badge ${zoneToBadge(d.statusZone)}`}>
                           {selectedYear === '2023' ? 'Observation' : d.statusZone}
@@ -675,84 +753,74 @@ export default function HospitalDashboard() {
             </div>
           </div>
 
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <h4 style={{ marginBottom: '1.25rem' }}>🏆 Inter-Hospital Performance Comparison</h4>
+            <div style={{ height: '300px', width: '100%', position: 'relative', borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '1rem 0 3rem 4rem' }}>
+              <div style={{ position: 'absolute', left: 0, top: '25%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: 600 }}>Tier 1</div>
+              <div style={{ position: 'absolute', left: 0, top: '75%', transform: 'translateY(-50%)', fontSize: '12px', fontWeight: 600 }}>Tier 2</div>
+              
+              {[1, 2].map((tier, i) => {
+                const stats = boxPlotStats.find(s => s._id.drg === selectedDRG && s._id.tier === tier && s._id.year === parseInt(selectedYear === '23-25' ? '2025' : selectedYear))
+                if (!stats) return <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: '10%', color: 'var(--text-muted)' }}>No data for Tier {tier}</div>
+                
+                const scale = (val) => `${((val - stats.min) / (stats.max - stats.min || 1)) * 80 + 10}%`
+                
+                return (
+                  <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: 0, right: 0, height: '40px', transform: 'translateY(-50%)' }}>
+                    <div style={{ position: 'absolute', left: scale(stats.min), right: `calc(100% - ${scale(stats.max)})`, top: '50%', height: '1px', background: 'var(--text-main)' }}></div>
+                    <div style={{ position: 'absolute', left: scale(stats.q1), right: `calc(100% - ${scale(stats.q3)})`, top: '10%', bottom: '10%', background: tier === 1 ? 'rgba(46,204,113,0.2)' : 'rgba(231,76,60,0.2)', border: `1px solid ${tier === 1 ? 'var(--success)' : 'var(--danger)'}`, borderRadius: '2px' }}></div>
+                    <div style={{ position: 'absolute', left: scale(stats.median), top: '10%', bottom: '10%', width: '2px', background: tier === 1 ? 'var(--success)' : 'var(--danger)' }}></div>
+                    {stats.outliers.map((o, idx) => (
+                      <div key={idx} style={{ position: 'absolute', left: scale(o), top: '50%', width: '4px', height: '4px', borderRadius: '50%', background: 'var(--text-muted)', transform: 'translate(-50%, -50%)' }}></div>
+                    ))}
+                  </div>
+                )
+              })}
+              
+              <div style={{ position: 'absolute', bottom: '10px', left: '10%', right: '10%', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+                <span>Min</span><span>Q1</span><span>Median</span><span>Q3</span><span>Max</span>
+              </div>
+            </div>
+          </div>
+
           {(selectedYear === '2024' || selectedYear === '2025') ? (
             <div className="card" style={{ marginBottom: '1.25rem', borderLeft: '4px solid var(--accent)' }}>
-              <h4 style={{ marginBottom: '1rem' }}>🧠 Quota Allocation Formula (Enforced)</h4>
-              <div className="grid grid-4" style={{ textAlign: 'center', gap: '1rem' }}>
-                <div style={{ padding: '0.5rem', background: 'var(--bg-card)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Historical Base</div>
-                  <div style={{ fontWeight: 700 }}>Prior Year Mean</div>
-                </div>
-                <div style={{ alignSelf: 'center', fontSize: '1.2rem' }}>×</div>
-                <div style={{ padding: '0.5rem', background: 'var(--bg-card)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Policy Multiplier</div>
-                  <div style={{ fontWeight: 700 }}>1.05 (Buffer)</div>
-                </div>
-                <div style={{ padding: '0.5rem', background: 'var(--bg-card)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Status</div>
-                  <div style={{ fontWeight: 700, color: 'var(--success)' }}>PROVED</div>
-                </div>
+              <h4 style={{ marginBottom: '1.5rem' }}>🧠 Quota Allocation Decision Engine</h4>
+              <div className="grid grid-5" style={{ gap: '1rem', textAlign: 'center' }}>
+                {[
+                  { step: '01', title: 'Historical Base', val: 'Prior Year Mean', desc: 'Avg cost per DRG.' },
+                  { step: '02', title: 'Risk Adjuster', val: '× 1.05 Buffer', desc: 'Inflation buffer.' },
+                  { step: '03', title: 'Regional Weight', val: 'Region Factor', desc: 'Locality adjustment.' },
+                  { step: '04', title: 'Final Quota', val: 'Approved RM', desc: 'Yearly money-pool.' },
+                  { step: '05', title: 'Enforcement', val: 'Daily Audit', desc: 'Live monitoring.' }
+                ].map((s, idx) => (
+                  <div key={idx} style={{ padding: '0.75rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--accent)', marginBottom: '0.5rem' }}>STEP {s.step}</div>
+                    <div style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)' }}>{s.title}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 600 }}>{s.val}</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{s.desc}</div>
+                  </div>
+                ))}
               </div>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1rem', textAlign: 'center' }}>
-                Formula: Allocation = (Prior Year Total Claims / N Hospitals) * Risk Adjuster
-              </p>
             </div>
           ) : (
             <div className="card" style={{ marginBottom: '1.25rem', textAlign: 'center', opacity: 0.6 }}>
-              <p>Calculation flow unavailable for Baseline/Observation years (2023).</p>
+              <p>Decision engine unavailable for Baseline/Observation years (2023).</p>
             </div>
           )}
 
-          <div className="card" style={{ marginBottom: '1.25rem' }}>
-            <h4 style={{ marginBottom: '1rem' }}>🏆 Inter-Hospital Comparison ({policyToggle === 'both' ? 'CN vs SG' : policyToggle.toUpperCase()})</h4>
-            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '220px', paddingBottom: '3rem', borderBottom: '1px solid var(--border)', position: 'relative', gap: '2rem' }}>
-              {/* Box Plot Visualization */}
-              {['Tier 1', 'Tier 2'].map((tier, i) => (
-                <div key={tier} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', position: 'relative' }}>
-                  {(policyToggle === 'china' || policyToggle === 'both') && (
-                    <div style={{ width: '40px', textAlign: 'center' }}>
-                      <div style={{ position: 'relative', height: i === 0 ? '140px' : '100px', width: '24px', background: 'var(--accent)', opacity: 0.3, margin: '0 auto', borderRadius: '4px', border: '1px solid var(--accent)' }}>
-                         <div style={{ position: 'absolute', bottom: '50%', left: '-4px', width: '30px', height: '2px', background: 'var(--accent)' }}></div>
-                      </div>
-                      <div style={{ fontSize: '10px', marginTop: '4px', color: 'var(--text-muted)' }}>CN</div>
-                    </div>
-                  )}
-                  {(policyToggle === 'singapore' || policyToggle === 'both') && (
-                    <div style={{ width: '40px', textAlign: 'center' }}>
-                      <div style={{ position: 'relative', height: i === 0 ? '120px' : '90px', width: '24px', background: '#3498db', opacity: 0.3, margin: '0 auto', borderRadius: '4px', border: '1px solid #3498db' }}>
-                         <div style={{ position: 'absolute', bottom: '50%', left: '-4px', width: '30px', height: '2px', background: '#3498db' }}></div>
-                      </div>
-                      <div style={{ fontSize: '10px', marginTop: '4px', color: 'var(--text-muted)' }}>SG</div>
-                    </div>
-                  )}
-                  <div style={{ textAlign: 'center', fontWeight: 600, position: 'absolute', bottom: '-35px', left: '50%', transform: 'translateX(-50%)', width: '100%', whiteSpace: 'nowrap' }}>{tier}</div>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '3rem', textAlign: 'center' }}>
-              Showing {policyToggle === 'both' ? 'China & Singapore' : policyToggle.toUpperCase()} benchmarks for {shortenDRG(selectedDRG)}.
-            </p>
-          </div>
-
           <div className="card">
-            <h4 style={{ marginBottom: '0.75rem' }}>📋 Hospital Breakdown — {shortenDRG(selectedDRG)}</h4>
+            <h4 style={{ marginBottom: '0.75rem' }}>📋 Hospital Performance Breakdown — {shortenDRG(selectedDRG)}</h4>
             <div className="table-wrapper" style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
                   <tr>
-                    <th>Hospital</th>
-                    <th>Tier</th>
-                    <th>Region</th>
-                    <th>Allocation (RM)</th>
-                    <th>Claim Request (RM)</th>
-                    <th>Penalty (RM)</th>
-                    <th>Status</th>
+                    <th>Hospital</th><th>Tier</th><th>Region</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Usage %</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {yearlyPoolDetails.filter(d =>
-                    d._id.drg === selectedDRG &&
-                    (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
+                  {yearlyPoolDetails.filter(d => 
+                    d._id.drg === selectedDRG && (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
                   ).map((d, i) => {
                     const h = allHospitals.find(x => x.name === d._id.hospital)
                     return (
@@ -760,9 +828,11 @@ export default function HospitalDashboard() {
                         <td style={{ fontWeight: 600 }}>{d._id.hospital}</td>
                         <td><span className={`badge ${h?.tier === 1 ? 'badge-success' : 'badge-danger'}`}>T{h?.tier || 2}</span></td>
                         <td>{h?.region || 'Other'}</td>
-                        <td>{selectedYear === '2023' ? 'None' : `RM ${d.poolAmount.toLocaleString()}`}</td>
+                        <td style={{ fontWeight: 600 }}>{selectedYear === '2023' ? 'None' : `RM ${d.poolAmount.toLocaleString()}`}</td>
                         <td>RM {d.claimRequestAmount.toLocaleString()}</td>
+                        <td style={{ color: 'var(--success)', fontWeight: 600 }}>RM {d.reimbursedAmount.toLocaleString()}</td>
                         <td style={{ color: d.penaltyAmount > 0 ? 'var(--danger)' : 'inherit' }}>RM {d.penaltyAmount.toLocaleString()}</td>
+                        <td><UsageBar pct={d.usagePct} /></td>
                         <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{selectedYear === '2023' ? 'Observation' : d.statusZone}</span></td>
                       </tr>
                     )
@@ -773,7 +843,6 @@ export default function HospitalDashboard() {
           </div>
         </div>
       )}
-
       {/* ── TIER VIEW ──────────────────────────────────────── */}
       {viewMode === 'tiers' && tierSummary && (
         <div className="animate-in">
