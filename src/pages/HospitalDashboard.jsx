@@ -567,14 +567,14 @@ export default function HospitalDashboard() {
               <div className="input-label" style={{ marginBottom: '0.35rem', color: 'rgba(255,255,255,0.95)', fontWeight: 600 }}>📅 Policy Year</div>
               <select
                 className="input"
-                style={{ background: 'rgba(255,255,255,1)', border: 'none', color: 'var(--text-main)', padding: '0.5rem 0.85rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
+                style={{ background: '--bg-primary', border: 'none', color: 'var(--text-primary)', padding: '0.5rem 0.85rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 700, boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
               >
-                <option value="23-25" style={{ color: 'var(--text-main)' }}>Baseline (23-25)</option>
-                <option value="2023" style={{ color: 'var(--text-main)' }}>2023 (Collection)</option>
-                <option value="2024" style={{ color: 'var(--text-main)' }}>2024 (Enforced)</option>
-                <option value="2025" style={{ color: 'var(--text-main)' }}>2025 (Enforced)</option>
+                <option value="23-25" style={{ color: 'var(--text-primary)' }}>Baseline (23-25)</option>
+                <option value="2023" style={{ color: 'var(--text-primary)' }}>2023 (Collection)</option>
+                <option value="2024" style={{ color: 'var(--text-primary)' }}>2024 (Enforced)</option>
+                <option value="2025" style={{ color: 'var(--text-primary)' }}>2025 (Enforced)</option>
               </select>
             </div>
           </div>
@@ -716,7 +716,7 @@ export default function HospitalDashboard() {
 
                 return (
                   <div key={tier} style={{ position: 'absolute', top: i === 0 ? '25%' : '75%', left: 0, right: 0, height: '40px', transform: 'translateY(-50%)' }}>
-                    <div style={{ position: 'absolute', left: scale(stats.min), right: `calc(100% - ${scale(stats.max)})`, top: '50%', height: '1px', background: 'var(--text-main)' }}></div>
+                    <div style={{ position: 'absolute', left: scale(stats.min), right: `calc(100% - ${scale(stats.max)})`, top: '50%', height: '1px', background: 'var(--text-primary)' }}></div>
                     <div style={{ position: 'absolute', left: scale(stats.q1), right: `calc(100% - ${scale(stats.q3)})`, top: '10%', bottom: '10%', background: tier === 1 ? 'rgba(46,204,113,0.2)' : 'rgba(231,76,60,0.2)', border: `1px solid ${tier === 1 ? 'var(--success)' : 'var(--danger)'}`, borderRadius: '2px' }}></div>
                     <div style={{ position: 'absolute', left: scale(stats.median), top: '10%', bottom: '10%', width: '2px', background: tier === 1 ? 'var(--success)' : 'var(--danger)' }}></div>
                     {stats.outliers.map((o, idx) => (
