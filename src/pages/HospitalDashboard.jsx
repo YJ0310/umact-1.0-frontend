@@ -94,6 +94,8 @@ export default function HospitalDashboard() {
   const [selectedDetailYear, setSelectedDetailYear] = useState('all')
   const [hospitalSearch, setHospitalSearch] = useState('')
   const [showHospitalSuggestions, setShowHospitalSuggestions] = useState(false)
+  const [isHospitalModalOpen, setIsHospitalModalOpen] = useState(false)
+  const [tempHospitalId, setTempHospitalId] = useState('')
   const [lastUpdate, setLastUpdate] = useState(new Date().toLocaleString())
 
   useEffect(() => {
@@ -551,55 +553,19 @@ export default function HospitalDashboard() {
         {/* Selectors (show only relevant one) */}
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
           {viewMode === 'byHospital' && (
-            <div style={{ flex: 1, position: 'relative' }}>
-              <div className="input-label" style={{ marginBottom: '0.25rem' }}>Select Hospital</div>
-              <div className="combobox-wrapper">
-                <input
-                  className="input combobox-input"
-                  placeholder="Search 60+ hospitals..."
-                  value={hospitalSearch}
-                  onChange={(e) => {
-                    setHospitalSearch(e.target.value)
-                    setShowHospitalSuggestions(true)
-                  }}
-                  onFocus={() => {
-                    if (hospitalSearch === hospital?.name) setHospitalSearch('')
-                    setShowHospitalSuggestions(true)
-                  }}
-                  onBlur={() => setTimeout(() => setShowHospitalSuggestions(false), 200)}
-                />
-                <span className="combobox-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                </span>
-              </div>
-              
-              {showHospitalSuggestions && (
-                <div className="combobox-content">
-                  {hospitalSuggestions.length ? (
-                    <div className="combobox-list">
-                      {hospitalSuggestions.map((h) => (
-                        <button
-                          key={h.id}
-                          className={`combobox-item ${selectedHospital === h.id ? 'selected' : ''}`}
-                          onClick={() => {
-                            setSelectedHospital(h.id)
-                            setHospitalSearch(h.name)
-                            setShowHospitalSuggestions(false)
-                          }}
-                        >
-                          <div className="combobox-item-text">
-                            {h.name}
-                            <span className="combobox-item-region">{h.region}</span>
-                          </div>
-                          <div className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="combobox-empty">No items found.</div>
-                  )}
-                </div>
-              )}
+            <div style={{ flex: 1 }}>
+              <div className="input-label" style={{ marginBottom: '0.25rem' }}>Active Hospital</div>
+              <button 
+                className="input" 
+                style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: 'var(--bg-card)' }}
+                onClick={() => {
+                  setTempHospitalId(selectedHospital);
+                  setIsHospitalModalOpen(true);
+                }}
+              >
+                <span>{hospital?.name || 'Select Hospital'}</span>
+                <span style={{ opacity: 0.5 }}>⚙️ Change</span>
+              </button>
             </div>
           )}
           {viewMode === 'byDRG' && (
@@ -836,6 +802,60 @@ export default function HospitalDashboard() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+      {/* ── Hospital Selection Modal ────────────────────────────── */}
+      {isHospitalModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content animate-in">
+            <div className="modal-header">
+              <h3>🏥 Select Hospital</h3>
+              <button className="modal-close" onClick={() => setIsHospitalModalOpen(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="combobox-wrapper" style={{ marginBottom: '1.5rem' }}>
+                <input
+                  className="input combobox-input"
+                  placeholder="Search 60+ hospitals by name or region..."
+                  autoFocus
+                  value={hospitalSearch}
+                  onChange={(e) => setHospitalSearch(e.target.value)}
+                />
+                <span className="combobox-icon">🔍</span>
+              </div>
+
+              <div className="combobox-list" style={{ maxHeight: '400px' }}>
+                {hospitalSuggestions.length ? hospitalSuggestions.map((h) => (
+                  <button
+                    key={h.id}
+                    className={`combobox-item ${tempHospitalId === h.id ? 'selected' : ''}`}
+                    onClick={() => setTempHospitalId(h.id)}
+                  >
+                    <div className="combobox-item-text">
+                      {h.name}
+                      <span className="combobox-item-region">{h.region}</span>
+                    </div>
+                    <div className={`badge ${h.tier === 1 ? 'badge-success' : 'badge-danger'}`}>Tier {h.tier}</div>
+                  </button>
+                )) : (
+                  <div className="combobox-empty">No hospitals found matching "{hospitalSearch}".</div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setIsHospitalModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={() => {
+                setSelectedHospital(tempHospitalId);
+                const h = allHospitals.find(x => x.id === tempHospitalId);
+                if (h) setHospitalSearch(h.name);
+                setIsHospitalModalOpen(false);
+              }}>Done</button>
             </div>
           </div>
         </div>
