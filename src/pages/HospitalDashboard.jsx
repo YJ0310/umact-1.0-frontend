@@ -672,6 +672,7 @@ export default function HospitalDashboard() {
               <table>
                 <thead>
                   <tr>
+                    {selectedYear === '23-25' && <th>Year</th>}
                     <th>DRG Category</th>
                     <th>Allocation (RM)</th>
                     <th>Claim Request (RM)</th>
@@ -682,24 +683,28 @@ export default function HospitalDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(drgGroupMode === 'category' ? Object.values(groupedHospitalData) : drgList.filter(d => hospital.drgs[d]).map(d => ({ ...hospital.drgs[d], name: d }))).map((d, i) => (
+                  {(selectedYear === '23-25' 
+                    ? yearlyPoolDetails.filter(d => d._id.hospital === hospital.name).sort((a,b) => a.policyYear - b.policyYear || a._id.drg.localeCompare(b._id.drg))
+                    : (drgGroupMode === 'category' ? Object.values(groupedHospitalData) : drgList.filter(d => hospital.drgs[d]).map(d => ({ ...hospital.drgs[d], name: d })))
+                  ).map((d, i) => (
                     <tr key={i}>
+                      {selectedYear === '23-25' && <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{d.policyYear}</td>}
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span className="badge" style={{ background: CATEGORY_COLORS[getDRGCategory(d.name)], color: 'white', fontSize: '10px' }}>
-                            {getDRGCategory(d.name).charAt(0)}
+                          <span className="badge" style={{ background: CATEGORY_COLORS[getDRGCategory(d.name || d._id?.drg)], color: 'white', fontSize: '10px' }}>
+                            {getDRGCategory(d.name || d._id?.drg).charAt(0)}
                           </span>
-                          {shortenDRG(d.name)}
+                          {shortenDRG(d.name || d._id?.drg)}
                         </div>
                       </td>
-                      <td style={{ fontWeight: 600 }}>{selectedYear === '2023' ? 'None (Baseline)' : (d.poolAmount ? `RM ${d.poolAmount.toLocaleString()}` : '0')}</td>
+                      <td style={{ fontWeight: 600 }}>{(selectedYear === '2023' || d.policyYear === 2023) ? 'None (Baseline)' : (d.poolAmount ? `RM ${d.poolAmount.toLocaleString()}` : '0')}</td>
                       <td>RM {d.claimRequestAmount.toLocaleString()}</td>
                       <td style={{ color: 'var(--success)', fontWeight: 600 }}>RM {d.reimbursedAmount.toLocaleString()}</td>
                       <td style={{ color: d.penaltyAmount > 0 ? 'var(--danger)' : 'inherit' }}>RM {d.penaltyAmount.toLocaleString()}</td>
                       <td><UsageBar pct={d.usagePct} /></td>
                       <td>
                         <span className={`badge ${zoneToBadge(d.statusZone)}`}>
-                          {selectedYear === '2023' ? 'Observation' : d.statusZone}
+                          {(selectedYear === '2023' || d.policyYear === 2023) ? 'Observation' : d.statusZone}
                         </span>
                       </td>
                     </tr>
@@ -818,25 +823,27 @@ export default function HospitalDashboard() {
               <table>
                 <thead>
                   <tr>
+                    {selectedYear === '23-25' && <th>Year</th>}
                     <th>Hospital</th><th>Tier</th><th>Region</th><th>Allocation (RM)</th><th>Claim Request (RM)</th><th>Actual Claim (RM)</th><th>Penalty (RM)</th><th>Usage %</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {yearlyPoolDetails.filter(d =>
+                  {yearlyPoolDetails.filter(d => 
                     d._id.drg === selectedDRG && (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
-                  ).map((d, i) => {
+                  ).sort((a,b) => a.policyYear - b.policyYear).map((d, i) => {
                     const h = allHospitals.find(x => x.name === d._id.hospital)
                     return (
                       <tr key={i}>
+                        {selectedYear === '23-25' && <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{d.policyYear}</td>}
                         <td style={{ fontWeight: 600 }}>{d._id.hospital}</td>
                         <td><span className={`badge ${h?.tier === 1 ? 'badge-success' : 'badge-danger'}`}>T{h?.tier || 2}</span></td>
                         <td>{h?.region || 'Other'}</td>
-                        <td style={{ fontWeight: 600 }}>{selectedYear === '2023' ? 'None' : `RM ${d.poolAmount.toLocaleString()}`}</td>
+                        <td style={{ fontWeight: 600 }}>{(selectedYear === '2023' || d.policyYear === 2023) ? 'None' : `RM ${d.poolAmount.toLocaleString()}`}</td>
                         <td>RM {d.claimRequestAmount.toLocaleString()}</td>
                         <td style={{ color: 'var(--success)', fontWeight: 600 }}>RM {d.reimbursedAmount.toLocaleString()}</td>
                         <td style={{ color: d.penaltyAmount > 0 ? 'var(--danger)' : 'inherit' }}>RM {d.penaltyAmount.toLocaleString()}</td>
                         <td><UsageBar pct={d.usagePct} /></td>
-                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{selectedYear === '2023' ? 'Observation' : d.statusZone}</span></td>
+                        <td><span className={`badge ${zoneToBadge(d.statusZone)}`}>{(selectedYear === '2023' || d.policyYear === 2023) ? 'Observation' : d.statusZone}</span></td>
                       </tr>
                     )
                   })}
