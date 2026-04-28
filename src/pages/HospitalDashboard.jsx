@@ -108,7 +108,7 @@ function ChartComponent({ config, height = 300 }) {
     chartRef.current = new Chart(ref.current.getContext('2d'), config)
     return () => { if (chartRef.current) chartRef.current.destroy() }
   }, [JSON.stringify(config)])
-  
+
   return <canvas ref={ref} style={{ maxHeight: currentHeight }} />
 }
 
@@ -126,8 +126,8 @@ export default function HospitalDashboard() {
   const [drgGroupMode, setDrgGroupMode] = useState('detailed') // 'detailed' | 'category'
   const [selectedHospital, setSelectedHospital] = useState('')
   const [selectedDRG, setSelectedDRG] = useState('')
-  const [policyToggle, setPolicyToggle] = useState('china') // Default to china as requested
-  const [selectedYear, setSelectedYear] = useState('2025') // Default to 2025
+  const [policyToggle, setPolicyToggle] = useState('china') // Default to china
+  const [selectedYear, setSelectedYear] = useState('2025') // Default to 2025 as requested
   const [hospitalSearch, setHospitalSearch] = useState('')
   const [isHospitalModalOpen, setIsHospitalModalOpen] = useState(false)
   const [tempHospitalId, setTempHospitalId] = useState('')
@@ -525,8 +525,6 @@ export default function HospitalDashboard() {
 
   return (
     <div className="container">
-  return (
-    <div className="container">
       {/* ── HEADER ────────────────────────────────────────────────── */}
       <div className="card animate-in" style={{ marginBottom: '1.25rem', padding: '1.25rem', background: 'linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%)', color: 'white', border: 'none' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -537,8 +535,8 @@ export default function HospitalDashboard() {
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '10px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Policy Year</div>
-              <select 
-                className="input" 
+              <select
+                className="input"
                 style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '0.4rem 0.75rem', borderRadius: '8px', cursor: 'pointer' }}
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
@@ -563,8 +561,8 @@ export default function HospitalDashboard() {
         <div className="grid grid-3" style={{ marginBottom: '1.25rem', gap: '1rem' }}>
           <div style={{ gridColumn: isMobile ? 'span 1' : 'span 2' }}>
             <div className="input-label" style={{ marginBottom: '0.25rem' }}>Search Hospital</div>
-            <button 
-              className="input combobox-trigger" 
+            <button
+              className="input combobox-trigger"
               style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               onClick={() => {
                 setTempHospitalId(selectedHospital);
@@ -665,6 +663,14 @@ export default function HospitalDashboard() {
                 {drgList.map(d => <option key={d} value={d}>{shortenDRG(d)}</option>)}
               </select>
             </div>
+            <div>
+              <div className="input-label" style={{ marginBottom: '0.25rem' }}>Comparison Mode</div>
+              <div className="tabs" style={{ marginBottom: 0 }}>
+                <button className={`tab ${policyToggle === 'china' ? 'active' : ''}`} onClick={() => setPolicyToggle('china')}>🇨🇳 CN</button>
+                <button className={`tab ${policyToggle === 'singapore' ? 'active' : ''}`} onClick={() => setPolicyToggle('singapore')}>🇸🇬 SG</button>
+                <button className={`tab ${policyToggle === 'both' ? 'active' : ''}`} onClick={() => setPolicyToggle('both')}>🔄 Both</button>
+              </div>
+            </div>
           </div>
 
           {(selectedYear === '2024' || selectedYear === '2025') ? (
@@ -696,20 +702,33 @@ export default function HospitalDashboard() {
           )}
 
           <div className="card" style={{ marginBottom: '1.25rem' }}>
-            <h4 style={{ marginBottom: '1rem' }}>🏆 Inter-Hospital Comparison (Box Plot Logic)</h4>
-            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '200px', paddingBottom: '2rem', borderBottom: '1px solid var(--border)', position: 'relative' }}>
+            <h4 style={{ marginBottom: '1rem' }}>🏆 Inter-Hospital Comparison ({policyToggle === 'both' ? 'CN vs SG' : policyToggle.toUpperCase()})</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '220px', paddingBottom: '3rem', borderBottom: '1px solid var(--border)', position: 'relative', gap: '2rem' }}>
+              {/* Box Plot Visualization */}
               {['Tier 1', 'Tier 2'].map((tier, i) => (
-                <div key={tier} style={{ width: '80px', textAlign: 'center' }}>
-                  <div style={{ position: 'relative', height: '150px', width: '30px', background: i === 0 ? 'var(--success)' : 'var(--danger)', opacity: 0.2, margin: '0 auto', borderRadius: '4px' }}>
-                    <div style={{ position: 'absolute', bottom: i === 0 ? '40%' : '20%', left: '-5px', width: '40px', height: '2px', background: i === 0 ? 'var(--success)' : 'var(--danger)', zIndex: 2 }}></div>
-                    <div style={{ position: 'absolute', bottom: i === 0 ? '30%' : '60%', left: '10px', width: '10px', height: '40px', border: `2px solid ${i === 0 ? 'var(--success)' : 'var(--danger)'}`, opacity: 1, zIndex: 1, background: 'white' }}></div>
-                  </div>
-                  <div style={{ marginTop: '0.5rem', fontWeight: 600 }}>{tier}</div>
+                <div key={tier} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', position: 'relative' }}>
+                  {(policyToggle === 'china' || policyToggle === 'both') && (
+                    <div style={{ width: '40px', textAlign: 'center' }}>
+                      <div style={{ position: 'relative', height: i === 0 ? '140px' : '100px', width: '24px', background: 'var(--accent)', opacity: 0.3, margin: '0 auto', borderRadius: '4px', border: '1px solid var(--accent)' }}>
+                         <div style={{ position: 'absolute', bottom: '50%', left: '-4px', width: '30px', height: '2px', background: 'var(--accent)' }}></div>
+                      </div>
+                      <div style={{ fontSize: '10px', marginTop: '4px', color: 'var(--text-muted)' }}>CN</div>
+                    </div>
+                  )}
+                  {(policyToggle === 'singapore' || policyToggle === 'both') && (
+                    <div style={{ width: '40px', textAlign: 'center' }}>
+                      <div style={{ position: 'relative', height: i === 0 ? '120px' : '90px', width: '24px', background: '#3498db', opacity: 0.3, margin: '0 auto', borderRadius: '4px', border: '1px solid #3498db' }}>
+                         <div style={{ position: 'absolute', bottom: '50%', left: '-4px', width: '30px', height: '2px', background: '#3498db' }}></div>
+                      </div>
+                      <div style={{ fontSize: '10px', marginTop: '4px', color: 'var(--text-muted)' }}>SG</div>
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'center', fontWeight: 600, position: 'absolute', bottom: '-35px', left: '50%', transform: 'translateX(-50%)', width: '100%', whiteSpace: 'nowrap' }}>{tier}</div>
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '1rem', textAlign: 'center' }}>
-              Comparison of {shortenDRG(selectedDRG)} claims across tiers. Box indicates IQR (25th-75th percentile).
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '3rem', textAlign: 'center' }}>
+              Showing {policyToggle === 'both' ? 'China & Singapore' : policyToggle.toUpperCase()} benchmarks for {shortenDRG(selectedDRG)}.
             </p>
           </div>
 
@@ -729,8 +748,8 @@ export default function HospitalDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {yearlyPoolDetails.filter(d => 
-                    d._id.drg === selectedDRG && 
+                  {yearlyPoolDetails.filter(d =>
+                    d._id.drg === selectedDRG &&
                     (selectedYear === '23-25' ? true : d.policyYear.toString() === selectedYear)
                   ).map((d, i) => {
                     const h = allHospitals.find(x => x.name === d._id.hospital)
@@ -854,6 +873,8 @@ export default function HospitalDashboard() {
               <button className="btn btn-ghost btn-sm" onClick={() => setIsHospitalModalOpen(false)}>Cancel</button>
               <button className="btn btn-primary btn-sm" style={{ minWidth: '80px' }} onClick={() => {
                 setSelectedHospital(tempHospitalId);
+                const h = allHospitals.find(x => x.id === tempHospitalId);
+                if (h) setHospitalSearch(h.name);
                 setIsHospitalModalOpen(false);
               }}>Done</button>
             </div>
