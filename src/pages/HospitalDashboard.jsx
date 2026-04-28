@@ -555,8 +555,8 @@ export default function HospitalDashboard() {
           {viewMode === 'byHospital' && (
             <div style={{ flex: 1 }}>
               <div className="input-label" style={{ marginBottom: '0.25rem' }}>Active Hospital</div>
-              <button 
-                className="input" 
+              <button
+                className="input"
                 style={{ width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: 'var(--bg-card)' }}
                 onClick={() => {
                   setTempHospitalId(selectedHospital);
@@ -806,7 +806,6 @@ export default function HospitalDashboard() {
           </div>
         </div>
       )}
-    </div>
 
       {/* ── Hospital Selection Modal ────────────────────────────── */}
       {isHospitalModalOpen && (
@@ -816,7 +815,7 @@ export default function HospitalDashboard() {
               <h3>🏥 Select Hospital</h3>
               <button className="modal-close" onClick={() => setIsHospitalModalOpen(false)}>×</button>
             </div>
-            
+
             <div className="modal-body">
               <div className="combobox-wrapper" style={{ marginBottom: '1.5rem' }}>
                 <input
