@@ -326,7 +326,7 @@ export default function InsurerDashboard() {
             ) : (
               <table>
                 <thead>
-                  <tr><th>Customer</th><th>Type</th><th>Hospital/DRG</th><th>Amount</th><th>Status</th><th>Decision</th></tr>
+                  <tr><th>Customer</th><th>Type</th><th>Hospital/DRG</th><th>Amount</th><th>Status</th><th>Attachments</th><th>Decision</th></tr>
                 </thead>
                 <tbody>
                   {requests.length === 0 ? (
@@ -342,6 +342,19 @@ export default function InsurerDashboard() {
                         <td>{r.payload?.hospitalName || '-'} / {r.payload?.drg || '-'}</td>
                         <td>RM {Number(r.payload?.claimAmount || 0).toLocaleString()}</td>
                         <td><span className={`badge ${r.status === 'approved' ? 'badge-success' : r.status === 'denied' ? 'badge-danger' : r.status === 'reviewed' ? 'badge-primary' : 'badge-warning'}`}>{r.status}</span></td>
+                        <td>
+                          {r.attachments && r.attachments.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              {r.attachments.map((file, idx) => (
+                                <span key={idx} className="badge badge-primary" style={{ fontSize: '0.75em', padding: '0.2rem 0.5rem', opacity: 0.9 }}>
+                                  📎 {file.originalName || `File ${idx+1}`}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{color: 'var(--text-muted)'}}>-</span>
+                          )}
+                        </td>
                         <td>
                           <div style={{display: 'grid', gap: '0.5rem'}}>
                             <input
