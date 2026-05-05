@@ -275,7 +275,7 @@ export default function PresentationDashboard() {
         <div className="table-wrapper">
           <table style={{ fontSize: '11px' }}>
             <thead>
-              <tr><th>Stakeholder</th><th>Current</th><th>ChinShi</th></tr>
+              <tr><th>Stakeholder</th><th>Current</th><th>RiskByte</th></tr>
             </thead>
             <tbody>
               <tr><td>Member OOP</td><td>RM 41.6M</td><td style={{ color: 'var(--success)', fontWeight: 700 }}>RM 35.6M</td></tr>
@@ -301,7 +301,7 @@ export default function PresentationDashboard() {
           <button className="badge badge-primary" style={{ cursor: 'pointer', border: 'none' }} onClick={() => window.print()}>
             📥 Export Report
           </button>
-          <span className="badge badge-primary" style={{ fontSize: '0.8rem' }}>Team ChinShi • UMACT 2026</span>
+          <span className="badge badge-primary" style={{ fontSize: '0.8rem' }}>Team RiskByte • UMACT 2026</span>
         </div>
       </div>
 

@@ -51,7 +51,7 @@ export default function Landing() {
           <span className="gradient-text">Reimagined with Data</span>
         </h1>
         <p className="hero-subtitle">
-          Team ChinShi's proof-of-concept for fair, transparent, and sustainable 
+          Team RiskByte's proof-of-concept for fair, transparent, and sustainable 
           healthcare financing under Malaysia's Base MHIT Plan.
         </p>
         <div style={{display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap'}}>
