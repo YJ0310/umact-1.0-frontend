@@ -162,7 +162,7 @@ function UsageBar({ pct }) {
    MAIN COMPONENT
    ══════════════════════════════════════════════════════════════ */
 export default function HospitalDashboard() {
-  const [allHospitals, setAllHospitals] = useState([])
+  const [rawHospitals, setRawHospitals] = useState([])
   const [drgList, setDrgList] = useState([])
   const [yearlyPoolDetails, setYearlyPoolDetails] = useState([])
   const [boxPlotStats, setBoxPlotStats] = useState([])
@@ -197,57 +197,63 @@ export default function HospitalDashboard() {
           setDrgList(uniqueDRGs)
           setYearlyPoolDetails(yearlyDetails)
           setBoxPlotStats(bStats)
+          setRawHospitals(hospitals)
+          setLoading(false)
+        } else {
+          console.error('Failed to load data', result.error)
+          setLoading(false)
+        }
+      })
+      .catch(err => {
+        console.error('Fetch error:', err)
+        setLoading(false)
+      })
+  }, [])
 
-          const mapped = hospitals.map(h => {
-            const tier = normalizeTier(h.tier || h.final_tier)
-            const drgs = {}
-            uniqueDRGs.forEach(drg => {
-              const match = hospitalDRG.find(d => d._id.hospital === h.hospital_name && d._id.drg === drg)
-              if (match) {
-                const avgClaim = Math.round(match.avgClaim)
-                const claimCount = match.count
-                const enforceQuota = Boolean(match.enforceQuota)
-                const poolAmount = enforceQuota ? Math.max(1, Math.round(match.poolAmount || 1)) : 0
-                const claimRequestAmount = Math.round(match.claimRequestAmount || 0)
-                const reimbursedAmount = Math.round(match.reimbursedAmount || claimRequestAmount)
-                const penaltyAmount = Math.round(match.penaltyAmount || Math.max(0, claimRequestAmount - reimbursedAmount))
-                const usagePct = typeof match.usagePct === 'number'
-                  ? match.usagePct
-                  : (poolAmount > 0 ? (claimRequestAmount / poolAmount) * 100 : null)
-                const statusZone = match.statusZone || 'Observe'
-                const oe = (avgClaim / (tier === 1 ? 18000 : 25000)).toFixed(3)
-                drgs[drg] = {
-                  avgClaim,
-                  claimCount,
-                  poolAmount,
-                  claimRequestAmount,
-                  reimbursedAmount,
-                  penaltyAmount,
-                  usagePct,
-                  statusZone,
-                  enforceQuota,
-                  oe: parseFloat(oe)
-                }
-              } else {
-                drgs[drg] = {
-                  avgClaim: 0,
-                  claimCount: 0,
-                  poolAmount: 0,
-                  claimRequestAmount: 0,
-                  reimbursedAmount: 0,
-                  penaltyAmount: 0,
-                  usagePct: null,
-                  statusZone: 'Observe',
-                  enforceQuota: false,
-                  oe: 1
-                }
-              }
-            })
-            // Map _id to id if needed, logic is expecting `id` string
-            return { id: h._id || h.hospital_name, name: h.hospital_name, tier, region: h.region, drgs }
-          })
+  const allHospitals = useMemo(() => {
+    if (!rawHospitals.length || !drgList.length || !yearlyPoolDetails.length) return []
+    return rawHospitals.map(h => {
+      const tier = normalizeTier(h.tier || h.final_tier)
+      const drgs = {}
+      drgList.forEach(drg => {
+        let targetRows = yearlyPoolDetails.filter(d => d._id.hospital === h.hospital_name && d._id.drg === drg)
+        if (selectedYear !== '23-25') {
+          targetRows = targetRows.filter(r => r.policyYear.toString() === selectedYear)
+        }
+        
+        if (targetRows.length > 0) {
+          const claimRequestAmount = targetRows.reduce((s, r) => s + r.claimRequestAmount, 0)
+          const reimbursedAmount = targetRows.reduce((s, r) => s + r.reimbursedAmount, 0)
+          const claimCount = targetRows.reduce((s, r) => s + r.count, 0)
+          const avgClaim = claimCount > 0 ? Math.round(targetRows.reduce((s, r) => s + (r.avgClaim * r.count), 0) / claimCount) : 0
+          const poolAmount = targetRows.reduce((s, r) => s + r.poolAmount, 0)
+          const penaltyAmount = targetRows.reduce((s, r) => s + r.penaltyAmount, 0)
+          
+          drgs[drg] = {
+            avgClaim,
+            claimCount,
+            poolAmount,
+            claimRequestAmount,
+            reimbursedAmount,
+            penaltyAmount,
+            usagePct: poolAmount > 0 ? (claimRequestAmount / poolAmount) * 100 : null,
+            statusZone: 'Observe', // Simplified
+            enforceQuota: targetRows.some(r => r.enforceQuota),
+            oe: (avgClaim / (tier === 1 ? 18000 : 25000))
+          }
+        } else {
+          drgs[drg] = {
+            avgClaim: 0, claimCount: 0, poolAmount: 0, claimRequestAmount: 0,
+            reimbursedAmount: 0, penaltyAmount: 0, usagePct: null,
+            statusZone: 'Observe', enforceQuota: false, oe: 1
+          }
+        }
+      })
+      return { id: h._id || h.hospital_name, name: h.hospital_name, tier, region: h.region, drgs }
+    })
+  }, [rawHospitals, drgList, yearlyPoolDetails, selectedYear])
 
-          console.log("allHospitals")
+  console.log("allHospitals")
           console.log(result)
           console.log(hospitals)
           console.log(hospitalDRG)
@@ -521,7 +527,17 @@ export default function HospitalDashboard() {
     if (policyToggle === 'china' || policyToggle === 'both') {
       datasets.push({
         label: 'China',
-        data: sorted.map((h) => Math.round(h.drgs[selectedDRG].reimbursedAmount || 0)),
+        data: sorted.map((h) => {
+          const d = h.drgs[selectedDRG]
+          if (selectedYear === '2023') {
+            const netPerClaim = Math.max(0, d.avgClaim - currentCopay(d.avgClaim))
+            return Math.round(netPerClaim * d.claimCount)
+          } else if (selectedYear === '23-25') {
+            return Math.round(d.claimRequestAmount || 0)
+          } else {
+            return Math.round(d.reimbursedAmount || 0)
+          }
+        }),
         backgroundColor: POLICY_COLORS.china,
         borderRadius: 4
       })
