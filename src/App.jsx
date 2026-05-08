@@ -36,11 +36,7 @@ function Navbar() {
         </button>
 
         <ul className={`navbar-links ${menuOpen ? 'open' : ''}`}>
-          <li><NavLink to="/get-quote" className={({isActive}) => isActive ? 'active' : ''}>💎 Get Quote</NavLink></li>
-          <li><NavLink to="/dashboard" className={({isActive}) => isActive ? 'active' : ''}>📊 My Dashboard</NavLink></li>
-          <li><NavLink to="/insurer" className={({isActive}) => isActive ? 'active' : ''}>🏢 Insurer</NavLink></li>
-          <li><NavLink to="/hospital" className={({isActive}) => isActive ? 'active' : ''}>🏥 Hospital</NavLink></li>
-          <li><NavLink to="/presentation" className={({isActive}) => isActive ? 'active' : ''}>🎯 Presentation</NavLink></li>
+          <li><NavLink to="/" className={({isActive}) => isActive ? 'active' : ''}>🏥 Hospital</NavLink></li>
           <li>
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
               {theme === 'dark' ? '☀️' : '🌙'}
@@ -71,12 +67,8 @@ function App() {
         <Navbar />
         <main className="page">
           <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/get-quote" element={<CustomerNew />} />
-            <Route path="/dashboard" element={<CustomerDashboard />} />
-            <Route path="/insurer" element={<InsurerDashboard />} />
+            <Route path="/" element={<HospitalDashboard />} />
             <Route path="/hospital" element={<HospitalDashboard />} />
-            <Route path="/presentation" element={<PresentationDashboard />} />
           </Routes>
         </main>
       </AlertProvider>
