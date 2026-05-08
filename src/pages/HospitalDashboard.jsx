@@ -742,6 +742,7 @@ export default function HospitalDashboard() {
           </div>
 
           {/* 2. AgCharts Box Plot */}
+          {/*
           <h4 style={{ marginBottom: '1.25rem' }}>🏆 Inter-Hospital Performance Comparison</h4>
           <div style={{ height: '400px', width: '100%' }}>
             <AgCharts options={{
@@ -780,6 +781,7 @@ export default function HospitalDashboard() {
               ]
             }} />
           </div>
+          */}
 
           {selectedYear === '2024' || selectedYear === '2025' ? (() => {
             const currentDRGData = yearlyPoolDetails.find(d => 
